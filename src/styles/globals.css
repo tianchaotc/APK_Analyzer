@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light theme */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f7f9;
+  --bg-tertiary: #eeeff2;
+  --bg-hover: #e8eaed;
+  --border-color: #d9dde3;
+  --border-subtle: #ebedf0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5a6072;
+  --text-tertiary: #8b9bb4;
+  --accent: #1a73e8;
+  --accent-hover: #1557b0;
+  --accent-subtle: #e8f0fd;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --success: #16a34a;
+}
+
+.dark {
+  /* Dark theme */
+  --bg-primary: #1a1b1e;
+  --bg-secondary: #141518;
+  --bg-tertiary: #25262b;
+  --bg-hover: #2a2b30;
+  --border-color: #333439;
+  --border-subtle: #25262b;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-subtle: #1e3a5f;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #22c55e;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Custom components */
+@layer components {
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-pointer transition-colors text-sm;
+    color: var(--text-secondary);
+  }
+  .nav-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+  }
+  .nav-item.active {
+    background-color: var(--accent-subtle);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .card {
+    @apply rounded-xl p-5;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+  }
+  .stat-card {
+    @apply rounded-xl p-4 flex flex-col gap-1;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium;
+  }
+  .badge-danger {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: var(--danger);
+  }
+  .badge-warning {
+    background-color: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+  }
+  .badge-success {
+    background-color: rgba(22, 163, 74, 0.1);
+    color: var(--success);
+  }
+  .badge-info {
+    background-color: rgba(26, 115, 232, 0.1);
+    color: var(--accent);
+  }
+  .badge-neutral {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+  }
+  .btn {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer flex items-center gap-2;
+  }
+  .btn-primary {
+    background-color: var(--accent);
+    color: white;
+  }
+  .btn-primary:hover {
+    background-color: var(--accent-hover);
+  }
+  .btn-secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--bg-hover);
+  }
+  .input {
+    @apply px-3 py-2 rounded-lg text-sm outline-none w-full;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+  }
+  .input:focus {
+    border-color: var(--accent);
+  }
+  .table-row {
+    @apply border-b transition-colors;
+    border-color: var(--border-subtle);
+  }
+  .table-row:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Drag area pulse */
+@keyframes pulse-border {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: var(--accent-hover); }
+}
+
+.drag-active {
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
