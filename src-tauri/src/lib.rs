@@ -4,6 +4,7 @@ pub mod parser;
 pub mod models;
 pub mod export;
 pub mod utils;
+pub mod plugin;
 
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
