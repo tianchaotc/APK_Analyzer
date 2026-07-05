@@ -28,6 +28,9 @@ pub static STATE: Lazy<AppState> = Lazy::new(AppState::default);
 pub fn run() {
     env_logger::init();
 
+    // 初始化插件管理器（扫描插件目录、加载动态库）
+    plugin::manager::init_global();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -43,6 +46,10 @@ pub fn run() {
             commands::add_recent_file,
             commands::clear_recent_files,
             commands::cancel_analysis,
+            commands::list_plugins,
+            commands::set_plugin_enabled,
+            commands::get_plugins_dir,
+            commands::plugin_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
