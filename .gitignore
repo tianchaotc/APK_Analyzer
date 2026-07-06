@@ -3,6 +3,8 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 plugin-sdk/target/
+plugins/*/target/
+test-apks/*.apk
 
 # Dependencies
 node_modules/

@@ -1,0 +1,15 @@
+{
+  "id": "com.apkanalyzer.perm-xcheck",
+  "name": "Permission Cross-Check",
+  "version": "0.1.0",
+  "author": "APK Analyzer Sample",
+  "description": "Cross-checks declared permissions by risk level and category, surfacing dangerous grants and unknown protection levels.",
+  "capabilities": ["analyzer", "ui"],
+  "analyzer_stage": "after_security",
+  "ui_tab": {
+    "id": "perm_xcheck",
+    "label": "Perm XCheck",
+    "icon": "ShieldCheck",
+    "order": 100
+  }
+}

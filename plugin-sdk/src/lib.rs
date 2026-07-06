@@ -288,7 +288,8 @@ macro_rules! export_plugin {
                 let m = PLUGIN_INSTANCE.metadata();
                 let json = serde_json::to_string(&m).unwrap_or_else(|_| "{}".to_string());
                 // leak：每个插件只在首次调用时泄漏一次，整个进程生命周期持有
-                Box::leak(json.into_boxed_str().as_bytes().into_boxed_slice())
+                // into_bytes -> Vec<u8> -> into_boxed_slice -> Box<[u8]>
+                Box::leak(json.into_bytes().into_boxed_slice())
             });
             leaked.as_ptr() as *const _
         }

@@ -2,6 +2,7 @@ use crate::parser::ApkReader;
 use crate::parser::signing;
 use crate::models::certificate::*;
 use std::fs;
+use std::collections::HashSet;
 
 pub struct CertificateAnalyzer;
 
@@ -98,11 +99,7 @@ fn parse_v1_signatures(apk: &mut ApkReader) -> Vec<signing::CertInfo> {
             let ext = name.rsplit('.').next().unwrap_or("");
             if ext == "RSA" || ext == "DSA" || ext == "EC" {
                 if let Ok(data) = apk.read_file(name) {
-                    if let Ok(cert_der) = extract_cert_from_pkcs7(&data) {
-                        if let Ok(cert) = signing::parse_x509_der(&cert_der) {
-                            certs.push(cert);
-                        }
-                    }
+                    certs.extend(extract_certs_from_pkcs7(&data));
                 }
             }
         }
@@ -111,18 +108,61 @@ fn parse_v1_signatures(apk: &mut ApkReader) -> Vec<signing::CertInfo> {
     certs
 }
 
-fn extract_cert_from_pkcs7(data: &[u8]) -> Result<Vec<u8>, String> {
+fn extract_certs_from_pkcs7(data: &[u8]) -> Vec<signing::CertInfo> {
+    let mut certs = Vec::new();
+    let mut seen_sha256 = HashSet::new();
     let mut pos = 0;
-    while pos < data.len().saturating_sub(4) {
-        if data[pos] == 0x30 && data[pos + 1] == 0x82 {
-            let cert_len = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
-            if cert_len > 100 && pos + 4 + cert_len <= data.len() {
-                return Ok(data[pos..pos + 4 + cert_len].to_vec());
+
+    while pos + 2 < data.len() {
+        if data[pos] != 0x30 {
+            pos += 1;
+            continue;
+        }
+
+        let Some((header_len, body_len)) = der_sequence_len(&data[pos..]) else {
+            pos += 1;
+            continue;
+        };
+        let total_len = header_len + body_len;
+        if total_len <= 100 || pos + total_len > data.len() {
+            pos += 1;
+            continue;
+        }
+
+        let der = &data[pos..pos + total_len];
+        if let Ok(cert) = signing::parse_x509_der(der) {
+            if seen_sha256.insert(cert.sha256.clone()) {
+                certs.push(cert);
             }
         }
+
         pos += 1;
     }
-    Err("No certificate found in PKCS#7".to_string())
+
+    certs
+}
+
+fn der_sequence_len(data: &[u8]) -> Option<(usize, usize)> {
+    if data.len() < 2 || data[0] != 0x30 {
+        return None;
+    }
+
+    let len_byte = data[1];
+    if len_byte & 0x80 == 0 {
+        return Some((2, len_byte as usize));
+    }
+
+    let len_bytes = (len_byte & 0x7f) as usize;
+    if len_bytes == 0 || len_bytes > 4 || data.len() < 2 + len_bytes {
+        return None;
+    }
+
+    let mut body_len = 0usize;
+    for b in &data[2..2 + len_bytes] {
+        body_len = (body_len << 8) | (*b as usize);
+    }
+
+    Some((2 + len_bytes, body_len))
 }
 
 fn is_debug_certificate(subject: &str) -> bool {

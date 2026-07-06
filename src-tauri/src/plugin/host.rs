@@ -87,11 +87,17 @@ extern "C" fn host_read_apk_file(
     out: *mut *mut u8,
     out_len: *mut usize,
 ) -> c_int {
+    if ctx.is_null() || out.is_null() || out_len.is_null() {
+        return ERR_INVALID_ARG;
+    }
     let path = match unsafe { from_cstr_ptr(path, path_len) } {
         Ok(s) => s,
         Err(code) => return code,
     };
     let ctx = unsafe { &*(ctx as *const HostContext) };
+    if ctx.apk.is_null() {
+        return ERR_NOT_FOUND;
+    }
     // SAFETY: 调用者保证 apk 指针有效且无别名借用
     let apk = unsafe { &mut *ctx.apk };
     match apk.read_file(&path) {
@@ -115,7 +121,13 @@ extern "C" fn host_list_apk_files(
     out: *mut *mut c_char,
     out_len: *mut usize,
 ) -> c_int {
+    if ctx.is_null() || out.is_null() || out_len.is_null() {
+        return ERR_INVALID_ARG;
+    }
     let ctx = unsafe { &*(ctx as *const HostContext) };
+    if ctx.apk.is_null() {
+        return ERR_NOT_FOUND;
+    }
     // SAFETY: 同上
     let apk = unsafe { &*ctx.apk };
     let names = apk.file_names();
@@ -139,7 +151,7 @@ extern "C" fn host_parse_axml(
     out: *mut *mut c_char,
     out_len: *mut usize,
 ) -> c_int {
-    if bytes.is_null() {
+    if bytes.is_null() || out.is_null() || out_len.is_null() {
         return ERR_INVALID_ARG;
     }
     let input = unsafe { std::slice::from_raw_parts(bytes, len) };
@@ -170,7 +182,7 @@ extern "C" fn host_parse_dex(
     out: *mut *mut c_char,
     out_len: *mut usize,
 ) -> c_int {
-    if bytes.is_null() {
+    if bytes.is_null() || out.is_null() || out_len.is_null() {
         return ERR_INVALID_ARG;
     }
     let input = unsafe { std::slice::from_raw_parts(bytes, len) };
@@ -203,6 +215,9 @@ extern "C" fn host_get_analysis(
     out: *mut *mut c_char,
     out_len: *mut usize,
 ) -> c_int {
+    if ctx.is_null() || out.is_null() || out_len.is_null() {
+        return ERR_INVALID_ARG;
+    }
     let key = match unsafe { from_cstr_ptr(key, key_len) } {
         Ok(s) => s,
         Err(code) => return code,

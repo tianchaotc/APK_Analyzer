@@ -202,10 +202,12 @@ impl PluginManager {
             }
         };
 
-        // 获取 vtable 符号
+        // 获取 vtable 入口函数并调用。
+        // 插件 SDK 导出的是 `apk_analyzer_plugin_vtable() -> *const PluginVTable`，
+        // 不是静态指针变量；这里必须先取函数符号再调用。
         let vtable_ptr: *const PluginVTable = unsafe {
-            match lib.get::<*const PluginVTable>(ENTRY_SYMBOL.as_bytes()) {
-                Ok(sym) => *sym,
+            match lib.get::<extern "C" fn() -> *const PluginVTable>(ENTRY_SYMBOL.as_bytes()) {
+                Ok(entry) => entry(),
                 Err(e) => {
                     let err = format!("Missing symbol '{}': {}", ENTRY_SYMBOL, e);
                     error!("Plugin {}: {}", manifest.id, err);

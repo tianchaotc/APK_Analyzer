@@ -35,6 +35,15 @@ pub struct PluginResult {
     pub error: Option<String>,
     /// 分析耗时（毫秒）
     pub duration_ms: u64,
+    /// 侧边栏 tab 显示名（来自 manifest.ui_tab.label），None 时前端 fallback 到 plugin_name
+    #[serde(default)]
+    pub ui_tab_label: Option<String>,
+    /// 侧边栏图标名（lucide-react 图标，如 "ShieldCheck"），None 时前端用默认图标
+    #[serde(default)]
+    pub ui_tab_icon: Option<String>,
+    /// 侧边栏排序权重（来自 manifest.ui_tab.order，越小越靠前）
+    #[serde(default)]
+    pub ui_tab_order: Option<u32>,
 }
 
 /// Progress update sent to frontend during analysis

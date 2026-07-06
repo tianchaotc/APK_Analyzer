@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../stores/useStore";
-import { Sidebar } from "./Sidebar";
+import { Sidebar, pluginIdFromSection } from "./Sidebar";
 import { Toolbar } from "./Toolbar";
 import { ProgressBar } from "./ProgressBar";
 import { OverviewPage } from "../../pages/OverviewPage";
@@ -14,6 +13,8 @@ import { DexPage } from "../../pages/DexPage";
 import { CertificatePage } from "../../pages/CertificatePage";
 import { SecurityPage } from "../../pages/SecurityPage";
 import { AISummaryPage } from "../../pages/AISummaryPage";
+import { PluginsPage } from "../../pages/PluginsPage";
+import { PluginPage } from "../plugin/PluginPage";
 import { SearchOverlay } from "../common/SearchOverlay";
 import { Package, X } from "lucide-react";
 
@@ -24,6 +25,22 @@ export function MainLayout() {
   if (!analysis) return null;
 
   const renderPage = () => {
+    // 插件管理页（侧边栏 "Manage Plugins" 入口）
+    if (activeSection === "plugins") {
+      return <PluginsPage />;
+    }
+
+    // 插件结果页：section ID = `plugin:<plugin_id>`
+    const pluginId = pluginIdFromSection(activeSection);
+    if (pluginId) {
+      const result = analysis.plugins.find((p) => p.plugin_id === pluginId);
+      if (result) {
+        return <PluginPage result={result} />;
+      }
+      // 找不到对应结果（例如插件被禁用），fallback 到管理页
+      return <PluginsPage />;
+    }
+
     switch (activeSection) {
       case "overview": return <OverviewPage />;
       case "manifest": return <ManifestPage />;

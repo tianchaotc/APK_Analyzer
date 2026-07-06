@@ -13,6 +13,52 @@ export interface ApkAnalysis {
   certificate: CertificateAnalysis;
   security: SecurityAnalysis;
   ai_summary: AISummary | null;
+  plugins: PluginResult[];
+}
+
+/// 单个插件的分析结果
+export interface PluginResult {
+  plugin_id: string;
+  plugin_name: string;
+  /// 插件返回的任意 JSON 数据
+  data: any;
+  /// UI schema JSON（声明式视图描述）
+  ui_schema: any;
+  /// 分析错误（如有）
+  error: string | null;
+  /// 分析耗时（毫秒）
+  duration_ms: number;
+  /// 侧边栏 tab 显示名（来自 manifest.ui_tab.label），None 时 fallback 到 plugin_name
+  ui_tab_label?: string | null;
+  /// 侧边栏图标名（lucide-react 图标，如 "ShieldCheck"），None 时用默认图标
+  ui_tab_icon?: string | null;
+  /// 侧边栏排序权重（来自 manifest.ui_tab.order，越小越靠前）
+  ui_tab_order?: number | null;
+}
+
+/// 插件管理摘要（来自 list_plugins 命令）
+export interface PluginSummary {
+  id: string;
+  name: string;
+  version: string;
+  author: string;
+  description: string;
+  enabled: boolean;
+  load_error: string | null;
+  capabilities: string[];
+}
+
+/// UI schema 支持的 section 类型
+export type UiSection =
+  | { type: "table"; data_key: string; columns: { key: string; label: string; width?: number }[] }
+  | { type: "cards"; data_key: string; card: { title_key: string; body_key: string } }
+  | { type: "stat_grid"; data_key: string; metrics: { key: string; label: string; unit?: string }[] }
+  | { type: "markdown"; data_key: string }
+  | { type: "chart_bar"; data_key: string; x_key: string; y_key: string };
+
+export interface PluginUiSchema {
+  title: string;
+  sections: UiSection[];
 }
 
 export interface OverviewInfo {
@@ -348,4 +394,6 @@ export type NavSection =
   | "dex"
   | "certificate"
   | "security"
-  | "ai_summary";
+  | "ai_summary"
+  | "plugins"
+  | string; // 允许插件动态 tab id

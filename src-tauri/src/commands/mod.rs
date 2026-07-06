@@ -66,49 +66,74 @@ pub async fn analyze_apk(
     // Open APK
     let _ = emit_progress(&window, "Opening APK", &format!("Opening {}", file_name), 5);
     let mut apk = ApkReader::open(&path)?;
-
-    // Run analyzers sequentially with progress updates
-    let stages: &[(&str, u8)] = &[
-        ("overview", 10), ("manifest", 20), ("permissions", 30),
-        ("components", 40), ("resources", 55), ("native_libs", 65),
-        ("dex", 75), ("certificate", 85), ("security", 95),
-    ];
+    let mut analysis_json = std::collections::HashMap::new();
+    let mut plugin_results = Vec::new();
 
     let _ = emit_progress(&window, "Overview", "Analyzing app overview...", 10);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let overview = overview::OverviewAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "overview", &overview);
+    plugin_results.extend(run_plugins_for_stage(
+        &window,
+        &path,
+        &analysis_json,
+        crate::plugin::manifest::AnalyzerStage::AfterOverview,
+        12,
+    )?);
 
     let _ = emit_progress(&window, "Manifest", "Parsing AndroidManifest.xml...", 20);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let manifest = manifest::ManifestAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "manifest", &manifest);
+    plugin_results.extend(run_plugins_for_stage(
+        &window,
+        &path,
+        &analysis_json,
+        crate::plugin::manifest::AnalyzerStage::AfterManifest,
+        22,
+    )?);
 
     let _ = emit_progress(&window, "Permissions", "Analyzing permissions...", 30);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let permissions = permissions::PermissionAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "permissions", &permissions);
 
     let _ = emit_progress(&window, "Components", "Analyzing components...", 40);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let components = components::ComponentAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "components", &components);
 
     let _ = emit_progress(&window, "Resources", "Analyzing resources...", 55);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let resources = resources::ResourceAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "resources", &resources);
 
     let _ = emit_progress(&window, "Native Libraries", "Analyzing native libraries...", 65);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let native_libs = native_libs::NativeLibAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "native_libs", &native_libs);
 
     let _ = emit_progress(&window, "DEX", "Analyzing DEX files...", 75);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let dex = dex::DexAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "dex", &dex);
 
     let _ = emit_progress(&window, "Certificate", "Analyzing certificates...", 85);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let certificate = certificate::CertificateAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "certificate", &certificate);
 
     let _ = emit_progress(&window, "Security", "Running security checks...", 95);
     if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
     let security = security::SecurityAnalyzer.analyze(&mut apk)?;
+    insert_analysis_json(&mut analysis_json, "security", &security);
+    plugin_results.extend(run_plugins_for_stage(
+        &window,
+        &path,
+        &analysis_json,
+        crate::plugin::manifest::AnalyzerStage::AfterSecurity,
+        96,
+    )?);
 
     // Build complete analysis
     let mut analysis = ApkAnalysis {
@@ -126,17 +151,23 @@ pub async fn analyze_apk(
         certificate,
         security,
         ai_summary: None,
-        plugins: Vec::new(),
+        plugins: plugin_results,
     };
 
     // Generate AI summary
     let _ = emit_progress(&window, "AI Summary", "Generating AI summary...", 98);
     let mut apk_for_ai = ApkReader::open(&path)?;
     let ai_summary = ai_analyzer::generate_summary(&mut apk_for_ai, &analysis);
+    insert_analysis_json(&mut analysis_json, "ai_summary", &ai_summary);
     analysis.ai_summary = Some(ai_summary);
 
-    // Run plugin analyzers
-    analysis.plugins = run_plugins(&window, &path, &analysis)?;
+    analysis.plugins.extend(run_plugins_for_stage(
+        &window,
+        &path,
+        &analysis_json,
+        crate::plugin::manifest::AnalyzerStage::Final,
+        99,
+    )?);
 
     let _ = emit_progress(&window, "Complete", "Analysis complete!", 100);
 
@@ -330,44 +361,67 @@ fn emit_progress(window: &tauri::WebviewWindow, stage: &str, message: &str, perc
 
 // ============ 插件集成 ============
 
-/// 构建内置分析结果的 JSON map，供插件通过 get_analysis 查询。
-fn build_analysis_json_map(analysis: &ApkAnalysis) -> std::collections::HashMap<&'static str, String> {
-    let mut map = std::collections::HashMap::new();
-    if let Ok(s) = serde_json::to_string(&analysis.overview) { map.insert("overview", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.manifest) { map.insert("manifest", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.permissions) { map.insert("permissions", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.components) { map.insert("components", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.resources) { map.insert("resources", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.native_libs) { map.insert("native_libs", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.dex) { map.insert("dex", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.certificate) { map.insert("certificate", s); }
-    if let Ok(s) = serde_json::to_string(&analysis.security) { map.insert("security", s); }
-    if let Some(ref ai) = analysis.ai_summary {
-        if let Ok(s) = serde_json::to_string(ai) { map.insert("ai_summary", s); }
+fn insert_analysis_json<T: serde::Serialize>(
+    map: &mut std::collections::HashMap<&'static str, String>,
+    key: &'static str,
+    value: &T,
+) {
+    if let Ok(s) = serde_json::to_string(value) {
+        map.insert(key, s);
     }
-    map
 }
 
-/// 运行所有已启用的插件分析器。
+fn analyzer_stage_label(stage: &crate::plugin::manifest::AnalyzerStage) -> &'static str {
+    match stage {
+        crate::plugin::manifest::AnalyzerStage::AfterOverview => "AfterOverview",
+        crate::plugin::manifest::AnalyzerStage::AfterManifest => "AfterManifest",
+        crate::plugin::manifest::AnalyzerStage::AfterSecurity => "AfterSecurity",
+        crate::plugin::manifest::AnalyzerStage::Final => "Final",
+    }
+}
+
+/// 运行指定阶段的已启用插件分析器。
 /// 单个插件 panic 或出错不会中断其他插件。
-fn run_plugins(
+fn run_plugins_for_stage(
     window: &tauri::WebviewWindow,
     apk_path: &str,
-    analysis: &ApkAnalysis,
+    analysis_json: &std::collections::HashMap<&'static str, String>,
+    stage: crate::plugin::manifest::AnalyzerStage,
+    progress_percent: u8,
 ) -> Result<Vec<crate::models::analysis::PluginResult>, String> {
     use crate::plugin;
     use std::ffi::CString;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
+    let stage_for_filter = stage.clone();
     let plugins = plugin::manager::with_manager(|m| {
         m.enabled_with_capability(plugin::manifest::Capability::Analyzer)
             .into_iter()
+            .filter(|p| {
+                p.manifest
+                    .analyzer_stage
+                    .clone()
+                    .unwrap_or(plugin::manifest::AnalyzerStage::Final)
+                    == stage_for_filter
+            })
             .filter_map(|p| {
                 let ptr = p.vtable.as_ptr();
                 if ptr.is_null() {
                     None
                 } else {
-                    Some((p.manifest.id.clone(), p.manifest.name.clone(), ptr))
+                    // 提取 manifest.ui_tab 的 label/icon/order 供前端侧边栏使用
+                    let (ui_tab_label, ui_tab_icon, ui_tab_order) = match &p.manifest.ui_tab {
+                        Some(t) => (Some(t.label.clone()), Some(t.icon.clone()), Some(t.order)),
+                        None => (None, None, None),
+                    };
+                    Some((
+                        p.manifest.id.clone(),
+                        p.manifest.name.clone(),
+                        ptr,
+                        ui_tab_label,
+                        ui_tab_icon,
+                        ui_tab_order,
+                    ))
                 }
             })
             .collect::<Vec<_>>()
@@ -377,16 +431,21 @@ fn run_plugins(
         return Ok(Vec::new());
     }
 
-    let _ = emit_progress(window, "Plugins", &format!("Running {} plugin(s)...", plugins.len()), 99);
+    let stage_label = analyzer_stage_label(&stage);
+    let _ = emit_progress(
+        window,
+        "Plugins",
+        &format!("Running {} plugin(s) at {}...", plugins.len(), stage_label),
+        progress_percent,
+    );
 
-    let analysis_json = build_analysis_json_map(analysis);
     let mut apk = ApkReader::open(apk_path)?;
     let mut results = Vec::with_capacity(plugins.len());
 
     let apk_path_c = CString::new(apk_path).map_err(|_| "apk_path contains nul".to_string())?;
     let apk_path_bytes = apk_path_c.as_bytes();
 
-    for (plugin_id, plugin_name, vtable_ptr) in plugins {
+    for (plugin_id, plugin_name, vtable_ptr, ui_tab_label, ui_tab_icon, ui_tab_order) in plugins {
         if vtable_ptr.is_null() {
             results.push(crate::models::analysis::PluginResult {
                 plugin_id: plugin_id.clone(),
@@ -395,6 +454,9 @@ fn run_plugins(
                 ui_schema: serde_json::Value::Null,
                 error: Some("vtable is null (load failed)".to_string()),
                 duration_ms: 0,
+                ui_tab_label,
+                ui_tab_icon,
+                ui_tab_order,
             });
             continue;
         }
@@ -472,6 +534,9 @@ fn run_plugins(
                     ui_schema,
                     error: None,
                     duration_ms,
+                    ui_tab_label,
+                    ui_tab_icon,
+                    ui_tab_order,
                 }
             }
             Ok((rc, out, out_len)) => {
@@ -486,6 +551,9 @@ fn run_plugins(
                     ui_schema: serde_json::Value::Null,
                     error: Some(format!("plugin analyze failed (rc={})", rc)),
                     duration_ms,
+                    ui_tab_label,
+                    ui_tab_icon,
+                    ui_tab_order,
                 }
             }
             Err(_) => {
@@ -497,6 +565,9 @@ fn run_plugins(
                     ui_schema: serde_json::Value::Null,
                     error: Some("plugin panicked during analyze".to_string()),
                     duration_ms,
+                    ui_tab_label,
+                    ui_tab_icon,
+                    ui_tab_order,
                 }
             }
         };
