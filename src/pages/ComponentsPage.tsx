@@ -79,6 +79,7 @@ export function ComponentsPage() {
         {activeTab === "exported" ? (
           <DataTable
             data={c.exported_components}
+            getRowId={(item) => `${item.component_type}:${item.name}`}
             searchKeys={["name", "component_type"]}
             columns={[
               {
@@ -115,6 +116,7 @@ export function ComponentsPage() {
         ) : (
           <DataTable
             data={componentData[activeTab]}
+            getRowId={(item) => item.name}
             searchKeys={["name", "permission"]}
             expandable
             expandRender={(item: Component) => (

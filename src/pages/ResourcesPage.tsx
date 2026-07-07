@@ -82,6 +82,7 @@ export function ResourcesPage() {
           </div>
           <DataTable
             data={r.image_stats.largest_images}
+            getRowId={(item) => item.path}
             searchKeys={["name", "path"]}
             pageSize={20}
             columns={[
@@ -97,6 +98,7 @@ export function ResourcesPage() {
       <Section title="Largest Resources">
         <DataTable
           data={r.largest_resources}
+          getRowId={(item) => item.path}
           searchKeys={["name", "path"]}
           pageSize={30}
           columns={[

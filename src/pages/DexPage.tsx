@@ -73,6 +73,7 @@ export function DexPage() {
         <Section title="Largest Packages">
           <DataTable
             data={d.largest_packages}
+            getRowId={(item) => item.name}
             searchKeys={["name"]}
             pageSize={20}
             columns={[
@@ -89,6 +90,7 @@ export function DexPage() {
       <Section title="All Packages">
         <DataTable
           data={d.packages}
+          getRowId={(item) => item.name}
           searchKeys={["name"]}
           pageSize={50}
           columns={[

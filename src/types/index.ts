@@ -21,9 +21,9 @@ export interface PluginResult {
   plugin_id: string;
   plugin_name: string;
   /// 插件返回的任意 JSON 数据
-  data: any;
+  data: unknown;
   /// UI schema JSON（声明式视图描述）
-  ui_schema: any;
+  ui_schema: unknown;
   /// 分析错误（如有）
   error: string | null;
   /// 分析耗时（毫秒）
@@ -375,6 +375,7 @@ export interface SearchResult {
   category: string;
   title: string;
   detail: string;
+  section?: NavSection;
 }
 
 export interface RecentFile {

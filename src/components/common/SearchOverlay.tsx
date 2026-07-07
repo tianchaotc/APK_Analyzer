@@ -1,32 +1,51 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../stores/useStore";
 import { Search, X } from "lucide-react";
 import type { SearchResult } from "../../types";
 
 export function SearchOverlay({ onClose }: { onClose: () => void }) {
-  const { setSearchQuery, setSearchResults } = useStore();
+  const { setActiveSection, setSearchQuery, setSearchResults } = useStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestSeq = useRef(0);
 
   const handleSearch = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
+      requestSeq.current++;
       setResults([]);
+      setLoading(false);
       return;
     }
+    const requestId = requestSeq.current + 1;
+    requestSeq.current = requestId;
     setLoading(true);
     try {
       const res = await invoke<SearchResult[]>("search_global", { query: q });
+      if (requestId !== requestSeq.current) return;
       setResults(res);
       setSearchQuery(q);
       setSearchResults(res);
-    } catch {
-      setResults([]);
+    } catch (e) {
+      if (requestId !== requestSeq.current) return;
+      if (e instanceof Error || typeof e === "string") {
+        setResults([]);
+        return;
+      }
+      throw e;
     } finally {
-      setLoading(false);
+      if (requestId === requestSeq.current) {
+        setLoading(false);
+      }
     }
   }, [setSearchQuery, setSearchResults]);
+
+  const handleResultClick = useCallback((result: SearchResult) => {
+    if (!result.section) return;
+    setActiveSection(result.section);
+    onClose();
+  }, [onClose, setActiveSection]);
 
   useEffect(() => {
     const timer = setTimeout(() => handleSearch(query), 200);
@@ -81,11 +100,16 @@ export function SearchOverlay({ onClose }: { onClose: () => void }) {
             <div className="py-1">
               {results.map((r, i) => (
                 <div
-                  key={i}
-                  className="px-4 py-2.5 hover:bg-opacity-80 cursor-pointer"
+                  key={`${r.category}:${r.title}:${r.detail}:${i}`}
+                  className={`px-4 py-2.5 hover:bg-opacity-80 ${r.section ? "cursor-pointer" : ""}`}
                   style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={() => handleResultClick(r)}
+                  onMouseEnter={(e) => {
+                    if (r.section) e.currentTarget.style.backgroundColor = "var(--bg-hover)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (r.section) e.currentTarget.style.backgroundColor = "transparent";
+                  }}
                 >
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{r.title}</span>

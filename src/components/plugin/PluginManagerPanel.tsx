@@ -21,8 +21,8 @@ export function PluginManagerPanel() {
     try {
       const list = await invoke<PluginSummary[]>("list_plugins");
       setPlugins(list);
-    } catch (e: any) {
-      setError(String(e));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -39,8 +39,8 @@ export function PluginManagerPanel() {
       setPlugins((prev) =>
         prev.map((p) => (p.id === plugin.id ? { ...p, enabled } : p))
       );
-    } catch (e: any) {
-      setError(`Failed to toggle ${plugin.id}: ${e}`);
+    } catch (e) {
+      setError(`Failed to toggle ${plugin.id}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setTogglingId(null);
     }
@@ -50,8 +50,8 @@ export function PluginManagerPanel() {
     try {
       const dir = await invoke<string>("get_plugins_dir");
       await open(dir);
-    } catch (e: any) {
-      setError(`Failed to open plugins directory: ${e}`);
+    } catch (e) {
+      setError(`Failed to open plugins directory: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -97,6 +97,10 @@ export function PluginManagerPanel() {
           <span className="text-xs" style={{ color: "var(--text-primary)" }}>{error}</span>
         </div>
       )}
+
+      <div className="rounded-lg p-3 border text-xs" style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--bg-secondary)", color: "var(--text-tertiary)" }}>
+        Refresh reloads the currently registered plugin list. If you add or replace plugin files, restart the app or re-run analysis if the new plugin does not appear.
+      </div>
 
       {/* Plugin list */}
       {plugins.length === 0 && !loading ? (

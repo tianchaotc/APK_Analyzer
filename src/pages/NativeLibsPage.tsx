@@ -49,6 +49,7 @@ export function NativeLibsPage() {
               </div>
               <DataTable
                 data={group.libraries}
+                getRowId={(item) => item.path}
                 searchKeys={["file_name"]}
                 pageSize={20}
                 columns={[
@@ -68,6 +69,7 @@ export function NativeLibsPage() {
       <Section title="All Libraries">
         <DataTable
           data={n.libraries}
+          getRowId={(item) => item.path}
           searchKeys={["file_name", "abi", "architecture"]}
           pageSize={50}
           columns={[

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ApkAnalysis, ProgressUpdate, NavSection, RecentFile } from "../types";
+import type { ApkAnalysis, ProgressUpdate, NavSection, RecentFile, SearchResult } from "../types";
 
 interface AppState {
   // Current analysis
@@ -16,7 +16,7 @@ interface AppState {
 
   // Search
   searchQuery: string;
-  searchResults: any[];
+  searchResults: SearchResult[];
 
   // Theme
   theme: "light" | "dark";
@@ -32,7 +32,7 @@ interface AppState {
   setActiveSection: (s: NavSection) => void;
   setRecentFiles: (f: RecentFile[]) => void;
   setSearchQuery: (q: string) => void;
-  setSearchResults: (r: any[]) => void;
+  setSearchResults: (r: SearchResult[]) => void;
   toggleTheme: () => void;
   setShowExportDialog: (v: boolean) => void;
   reset: () => void;
@@ -69,10 +69,12 @@ export const useStore = create<AppState>((set) => ({
   reset: () =>
     set({
       analysis: null,
+      isAnalyzing: false,
       progress: null,
       error: null,
       activeSection: "overview",
       searchQuery: "",
       searchResults: [],
+      showExportDialog: false,
     }),
 }));

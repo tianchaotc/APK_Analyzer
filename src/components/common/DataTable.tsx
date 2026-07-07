@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { Search, ChevronDown, ChevronRight } from "lucide-react";
 
 interface DataTableProps<T> {
@@ -16,9 +16,10 @@ interface DataTableProps<T> {
   expandable?: boolean;
   expandRender?: (item: T) => React.ReactNode;
   pageSize?: number;
+  getRowId?: (item: T, index: number) => string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends object>({
   data,
   columns,
   searchable = true,
@@ -27,11 +28,12 @@ export function DataTable<T extends Record<string, any>>({
   expandable = false,
   expandRender,
   pageSize = 50,
+  getRowId,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
@@ -40,7 +42,7 @@ export function DataTable<T extends Record<string, any>>({
       const lower = search.toLowerCase();
       result = result.filter((item) =>
         searchKeys.some((key) =>
-          String(item[key] ?? "").toLowerCase().includes(lower)
+          String(getCellValue(item, key) ?? "").toLowerCase().includes(lower)
         )
       );
     } else if (search) {
@@ -52,8 +54,8 @@ export function DataTable<T extends Record<string, any>>({
 
     if (sortKey) {
       result = [...result].sort((a, b) => {
-        const av = a[sortKey];
-        const bv = b[sortKey];
+        const av = getCellValue(a, sortKey);
+        const bv = getCellValue(b, sortKey);
         if (typeof av === "number" && typeof bv === "number") {
           return sortDir === "asc" ? av - bv : bv - av;
         }
@@ -65,8 +67,14 @@ export function DataTable<T extends Record<string, any>>({
     return result;
   }, [data, search, searchKeys, sortKey, sortDir]);
 
-  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(filtered.length / pageSize);
+  const maxPage = Math.max(0, totalPages - 1);
+  const currentPage = Math.min(page, maxPage);
+  const paged = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, maxPage));
+  }, [maxPage]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) {
@@ -77,12 +85,12 @@ export function DataTable<T extends Record<string, any>>({
     }
   };
 
-  const toggleExpand = (index: number) => {
+  const toggleExpand = (id: string) => {
     const next = new Set(expandedRows);
-    if (next.has(index)) {
-      next.delete(index);
+    if (next.has(id)) {
+      next.delete(id);
     } else {
-      next.add(index);
+      next.add(id);
     }
     setExpandedRows(next);
   };
@@ -133,30 +141,31 @@ export function DataTable<T extends Record<string, any>>({
               </tr>
             ) : (
               paged.map((item, i) => {
-                const realIndex = page * pageSize + i;
-                const isExpanded = expandedRows.has(realIndex);
+                const realIndex = currentPage * pageSize + i;
+                const rowId = getRowId ? getRowId(item, realIndex) : String(realIndex);
+                const isExpanded = expandedRows.has(rowId);
                 return (
-                  <>
-                    <tr key={realIndex} className="table-row">
+                  <Fragment key={rowId}>
+                    <tr className="table-row">
                       {expandable && (
-                        <td className="px-3 py-2.5 cursor-pointer" onClick={() => toggleExpand(realIndex)}>
+                        <td className="px-3 py-2.5 cursor-pointer" onClick={() => toggleExpand(rowId)}>
                           {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         </td>
                       )}
                       {columns.map((col) => (
                         <td key={String(col.key)} className="px-3 py-2.5" style={{ color: "var(--text-primary)" }}>
-                          {col.render ? col.render(item) : String(item[col.key] ?? "")}
+                          {col.render ? col.render(item) : String(getCellValue(item, col.key) ?? "")}
                         </td>
                       ))}
                     </tr>
                     {expandable && isExpanded && expandRender && (
-                      <tr key={`${realIndex}-expand`}>
+                      <tr>
                         <td colSpan={columns.length + 1} className="px-6 py-3" style={{ backgroundColor: "var(--bg-secondary)" }}>
                           {expandRender(item)}
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })
             )}
@@ -167,19 +176,19 @@ export function DataTable<T extends Record<string, any>>({
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-3">
           <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-            {filtered.length} items · Page {page + 1} of {totalPages}
+            {filtered.length} items · Page {currentPage + 1} of {totalPages}
           </span>
           <div className="flex gap-1">
             <button
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
+              onClick={() => setPage(Math.max(0, currentPage - 1))}
+              disabled={currentPage === 0}
               className="btn btn-secondary text-xs px-3 py-1.5 disabled:opacity-40"
             >
               Previous
             </button>
             <button
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={page >= totalPages - 1}
+              onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
+              disabled={currentPage >= totalPages - 1}
               className="btn btn-secondary text-xs px-3 py-1.5 disabled:opacity-40"
             >
               Next
@@ -203,6 +212,11 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
   );
 }
 
+function getCellValue<T extends object>(item: T, key: keyof T | string): unknown {
+  const keyString = String(key);
+  return Object.entries(item).find(([entryKey]) => entryKey === keyString)?.[1];
+}
+
 export function InfoGrid({ items }: { items: { label: string; value: React.ReactNode; badge?: string }[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -211,7 +225,7 @@ export function InfoGrid({ items }: { items: { label: string; value: React.React
           <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>{item.label}</span>
           <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
             {item.value}
-            {item.badge && <span className={`badge ${item.badge} ml-2`}>{}</span>}
+            {item.badge && <span className={`badge ${item.badge} ml-2`}>{item.badge}</span>}
           </span>
         </div>
       ))}

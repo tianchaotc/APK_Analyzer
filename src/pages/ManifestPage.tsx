@@ -100,6 +100,7 @@ export function ManifestPage() {
 
             <DataTable
               data={componentData[activeTab]}
+              getRowId={(item) => item.name}
               searchPlaceholder={`Search ${activeTab}...`}
               searchKeys={["name", "permission"]}
               expandable
@@ -185,6 +186,7 @@ export function ManifestPage() {
             <Section title="Application Meta-data">
               <DataTable
                 data={m.meta_data}
+                getRowId={(item) => item.name}
                 searchKeys={["name", "value"]}
                 pageSize={20}
                 columns={[

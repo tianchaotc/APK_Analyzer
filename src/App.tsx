@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "./stores/useStore";
 import { HomePage } from "./pages/HomePage";
@@ -16,6 +16,8 @@ export default function App() {
 
   // Load recent files on mount
   useEffect(() => {
+    if (!isTauri()) return;
+
     invoke<import("./types").RecentFile[]>("get_recent_files")
       .then((files) => setRecentFiles(files))
       .catch(() => {});
@@ -23,6 +25,8 @@ export default function App() {
 
   // Listen for progress events
   useEffect(() => {
+    if (!isTauri()) return;
+
     const unlisten = listen<import("./types").ProgressUpdate>("analysis-progress", (event) => {
       setProgress(event.payload);
     });

@@ -1,9 +1,11 @@
-import { useCallback, useState, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useStore } from "../stores/useStore";
 import { FileSearch, Clock, X, Package, Sun, Moon, Upload, Loader2 } from "lucide-react";
 import { formatFileSize } from "../utils/format";
+import type { ApkAnalysis, RecentFile } from "../types";
 
 export function HomePage() {
   const { setAnalysis, setAnalyzing, setError, recentFiles, setRecentFiles, theme, toggleTheme, error, isAnalyzing, progress } = useStore();
@@ -14,14 +16,55 @@ export function HomePage() {
     setAnalyzing(true);
     setError(null);
     try {
-      const result = await invoke<import("../types").ApkAnalysis>("analyze_apk", { path });
+      const result = await invoke<ApkAnalysis>("analyze_apk", { path });
       setAnalysis(result);
-    } catch (e: any) {
-      setError(typeof e === "string" ? e : e.message || "Analysis failed");
+      const files = await invoke<RecentFile[]>("get_recent_files");
+      setRecentFiles(files);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setAnalyzing(false);
     }
-  }, [setAnalysis, setAnalyzing, setError]);
+  }, [setAnalysis, setAnalyzing, setError, setRecentFiles]);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlisten: (() => void) | null = null;
+    let cancelled = false;
+
+    getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "over") {
+        setIsDragging(true);
+        return;
+      }
+
+      setIsDragging(false);
+      dragCounter.current = 0;
+
+      if (event.payload.type === "drop") {
+        const path = event.payload.paths[0];
+        if (path?.toLowerCase().endsWith(".apk")) {
+          void handleAnalyze(path);
+          return;
+        }
+        setError("Please drop an APK file");
+      }
+    }).then((cleanup) => {
+      if (cancelled) {
+        cleanup();
+        return;
+      }
+      unlisten = cleanup;
+    }).catch((e) => {
+      setError(e instanceof Error ? e.message : String(e));
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [handleAnalyze, setError]);
 
   const handleBrowse = useCallback(async () => {
     try {
@@ -30,29 +73,24 @@ export function HomePage() {
         multiple: false,
       });
       if (selected) {
-        await handleAnalyze(selected as string);
+        const path = Array.isArray(selected) ? selected[0] : selected;
+        if (path) {
+          await handleAnalyze(path);
+        }
       }
     } catch (e) {
-      // Dialog cancelled
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, [handleAnalyze]);
+  }, [handleAnalyze, setError]);
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     dragCounter.current = 0;
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      const file = files[0];
-      // Tauri provides the path via the path property
-      const path = (file as any).path || file.name;
-      if (path && path.endsWith(".apk")) {
-        await handleAnalyze(path);
-      } else {
-        setError("Please drop an APK file");
-      }
+    if (e.dataTransfer.files.length > 0) {
+      setError("Browser file drops do not expose a filesystem path. Use Browse or drop the APK onto the app window.");
     }
-  }, [handleAnalyze, setError]);
+  }, [setError]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();

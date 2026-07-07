@@ -111,6 +111,7 @@ export function PermissionsPage() {
 
         <DataTable
           data={filtered}
+          getRowId={(item) => item.name}
           searchKeys={["name", "category", "description"]}
           pageSize={50}
           expandable

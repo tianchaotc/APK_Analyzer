@@ -8,6 +8,7 @@ export function ExportDialog() {
   const { showExportDialog, setShowExportDialog } = useStore();
   const [exporting, setExporting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   if (!showExportDialog) return null;
 
@@ -21,6 +22,7 @@ export function ExportDialog() {
   const handleExport = async (format: string) => {
     setExporting(true);
     setSuccess(false);
+    setExportError(null);
     try {
       const extension = format;
       const filePath = await save({
@@ -33,10 +35,11 @@ export function ExportDialog() {
         setTimeout(() => {
           setShowExportDialog(false);
           setSuccess(false);
+          setExportError(null);
         }, 1500);
       }
     } catch (e) {
-      console.error("Export failed:", e);
+      setExportError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -95,6 +98,12 @@ export function ExportDialog() {
             <div className="flex items-center justify-center gap-2 mt-4">
               <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
               <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Exporting...</span>
+            </div>
+          )}
+
+          {exportError && (
+            <div className="mt-4 rounded-lg p-3 text-xs" style={{ backgroundColor: "var(--danger-bg)", color: "var(--danger)" }}>
+              {exportError}
             </div>
           )}
         </div>
