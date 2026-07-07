@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::collections::HashMap;
+use std::io::Cursor;
 
 /// DEX file header
 const DEX_MAGIC: &[u8] = b"dex\n";
@@ -27,10 +27,17 @@ impl DexParser {
         cursor.set_position(32);
 
         // File size
-        let file_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+        let file_size = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| format!("DEX header file_size: {}", e))?;
 
         // Header size
-        let _header_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+        let header_size = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| format!("DEX header_size: {}", e))?;
+        if header_size < 112 || file_size as usize > data.len() {
+            return Err("DEX header has invalid size bounds".to_string());
+        }
 
         // Endian tag
         let _endian_tag = cursor.read_u32::<LittleEndian>().unwrap_or(0);
@@ -44,11 +51,11 @@ impl DexParser {
 
         // String IDs
         let string_ids_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-        let _string_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+        let string_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
 
         // Type IDs
         let type_ids_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-        let _type_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+        let type_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
 
         // Proto IDs
         let proto_ids_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
@@ -72,25 +79,21 @@ impl DexParser {
 
         // Parse string table
         let strings = if string_ids_size > 0 {
-            cursor.set_position(56);
-            let string_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-            parse_string_table(data, string_ids_off, string_ids_size)
+            parse_string_table(data, string_ids_off, string_ids_size)?
         } else {
             Vec::new()
         };
 
         // Parse type table
         let types = if type_ids_size > 0 {
-            cursor.set_position(64);
-            let type_ids_off = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-            parse_type_table(data, type_ids_off, type_ids_size, &strings)
+            parse_type_table(data, type_ids_off, type_ids_size, &strings)?
         } else {
             Vec::new()
         };
 
         // Parse class defs
         let (class_names, package_info) = if class_defs_size > 0 {
-            parse_class_defs(data, class_defs_off, class_defs_size, &types, &strings)
+            parse_class_defs(data, class_defs_off, class_defs_size, &types, &strings)?
         } else {
             (Vec::new(), HashMap::new())
         };
@@ -109,83 +112,87 @@ impl DexParser {
     }
 }
 
-fn parse_string_table(data: &[u8], offset: u32, count: u32) -> Vec<String> {
+fn parse_string_table(data: &[u8], offset: u32, count: u32) -> Result<Vec<String>, String> {
     let mut strings = Vec::with_capacity(count as usize);
     let mut pos = offset as usize;
+    ensure_table_bounds(data, pos, count, 4, "string_ids")?;
 
     for _ in 0..count {
-        if pos + 4 > data.len() {
-            break;
-        }
-        let str_data_off = u32::from_le_bytes([
-            data[pos], data[pos + 1], data[pos + 2], data[pos + 3],
-        ]) as usize;
+        let str_data_off =
+            u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
         pos += 4;
 
-        let s = read_uleb128_string(data, str_data_off);
+        let s = read_uleb128_string(data, str_data_off)?;
         strings.push(s);
     }
 
-    strings
+    Ok(strings)
 }
 
-fn read_uleb128_string(data: &[u8], offset: usize) -> String {
+fn read_uleb128_string(data: &[u8], offset: usize) -> Result<String, String> {
     if offset >= data.len() {
-        return String::new();
+        return Err("DEX string offset out of bounds".to_string());
     }
 
     // Read ULEB128 length
-    let (len, bytes_read) = read_uleb128(data, offset);
-    let str_start = offset + bytes_read;
+    let (len, bytes_read) = read_uleb128(data, offset)?;
+    let str_start = offset
+        .checked_add(bytes_read)
+        .ok_or_else(|| "DEX string start overflow".to_string())?;
     let str_len = len as usize;
 
-    if str_start + str_len > data.len() {
-        return String::new();
+    if str_start
+        .checked_add(str_len)
+        .map_or(true, |end| end > data.len())
+    {
+        return Err("DEX string data out of bounds".to_string());
     }
 
     // MUTF-8 encoded string
-    String::from_utf8_lossy(&data[str_start..str_start + str_len]).to_string()
+    Ok(String::from_utf8_lossy(&data[str_start..str_start + str_len]).to_string())
 }
 
-fn read_uleb128(data: &[u8], offset: usize) -> (u64, usize) {
+fn read_uleb128(data: &[u8], offset: usize) -> Result<(u64, usize), String> {
     let mut result: u64 = 0;
     let mut shift = 0;
     let mut pos = offset;
 
-    loop {
+    for _ in 0..5 {
         if pos >= data.len() {
-            return (result, pos - offset);
+            return Err("DEX truncated ULEB128".to_string());
         }
         let byte = data[pos];
         pos += 1;
         result |= ((byte & 0x7F) as u64) << shift;
         if byte & 0x80 == 0 {
-            break;
+            return Ok((result, pos - offset));
         }
         shift += 7;
     }
 
-    (result, pos - offset)
+    Err("DEX ULEB128 exceeds 5 bytes".to_string())
 }
 
-fn parse_type_table(data: &[u8], offset: u32, count: u32, strings: &[String]) -> Vec<String> {
+fn parse_type_table(
+    data: &[u8],
+    offset: u32,
+    count: u32,
+    strings: &[String],
+) -> Result<Vec<String>, String> {
     let mut types = Vec::with_capacity(count as usize);
     let mut pos = offset as usize;
+    ensure_table_bounds(data, pos, count, 4, "type_ids")?;
 
     for _ in 0..count {
-        if pos + 4 > data.len() {
-            break;
-        }
-        let descriptor_idx = u32::from_le_bytes([
-            data[pos], data[pos + 1], data[pos + 2], data[pos + 3],
-        ]) as usize;
+        let descriptor_idx =
+            u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
         pos += 4;
 
         let type_str = strings.get(descriptor_idx).cloned().unwrap_or_default();
         types.push(type_str);
     }
 
-    types
+    Ok(types)
 }
 
 fn parse_class_defs(
@@ -193,22 +200,24 @@ fn parse_class_defs(
     offset: u32,
     count: u32,
     types: &[String],
-    strings: &[String],
-) -> (Vec<String>, HashMap<String, crate::models::dex::PackageInfo>) {
+    _strings: &[String],
+) -> Result<
+    (
+        Vec<String>,
+        HashMap<String, crate::models::dex::PackageInfo>,
+    ),
+    String,
+> {
     let mut class_names = Vec::with_capacity(count as usize);
     let mut packages: HashMap<String, crate::models::dex::PackageInfo> = HashMap::new();
 
     let mut pos = offset as usize;
     let class_def_size = 32; // Each class_def_item is 32 bytes
+    ensure_table_bounds(data, pos, count, class_def_size, "class_defs")?;
 
     for _ in 0..count {
-        if pos + class_def_size > data.len() {
-            break;
-        }
-
-        let class_idx = u32::from_le_bytes([
-            data[pos], data[pos + 1], data[pos + 2], data[pos + 3],
-        ]) as usize;
+        let class_idx =
+            u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
         pos += class_def_size;
 
         let class_descriptor = types.get(class_idx).cloned().unwrap_or_default();
@@ -219,19 +228,39 @@ fn parse_class_defs(
 
         // Extract package
         if let Some(pkg) = extract_package(&class_descriptor) {
-            let entry = packages.entry(pkg.clone()).or_insert_with(|| {
-                crate::models::dex::PackageInfo {
-                    name: pkg,
-                    class_count: 0,
-                    method_count: 0,
-                    field_count: 0,
-                }
-            });
+            let entry =
+                packages
+                    .entry(pkg.clone())
+                    .or_insert_with(|| crate::models::dex::PackageInfo {
+                        name: pkg,
+                        class_count: 0,
+                        method_count: 0,
+                        field_count: 0,
+                    });
             entry.class_count += 1;
         }
     }
 
-    (class_names, packages)
+    Ok((class_names, packages))
+}
+
+fn ensure_table_bounds(
+    data: &[u8],
+    offset: usize,
+    count: u32,
+    item_size: usize,
+    table_name: &str,
+) -> Result<(), String> {
+    let byte_len = (count as usize)
+        .checked_mul(item_size)
+        .ok_or_else(|| format!("DEX {} size overflow", table_name))?;
+    if offset
+        .checked_add(byte_len)
+        .map_or(true, |end| end > data.len())
+    {
+        return Err(format!("DEX {} table out of bounds", table_name));
+    }
+    Ok(())
 }
 
 fn descriptor_to_classname(descriptor: &str) -> String {
@@ -254,6 +283,45 @@ fn extract_package(descriptor: &str) -> Option<String> {
         Some(parts[1].to_string())
     } else {
         Some("(default)".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_dex() -> Vec<u8> {
+        let mut data = vec![0u8; 112];
+        data[0..8].copy_from_slice(b"dex\n035\0");
+        data[32..36].copy_from_slice(&(112u32).to_le_bytes());
+        data[36..40].copy_from_slice(&(112u32).to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn parse_rejects_string_table_past_file_bounds() {
+        let mut data = minimal_dex();
+        data[56..60].copy_from_slice(&(1u32).to_le_bytes());
+        data[60..64].copy_from_slice(&(200u32).to_le_bytes());
+
+        let result = DexParser::parse(&data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_rejects_truncated_uleb128_string() {
+        let mut data = minimal_dex();
+        data.resize(120, 0);
+        data[32..36].copy_from_slice(&(120u32).to_le_bytes());
+        data[56..60].copy_from_slice(&(1u32).to_le_bytes());
+        data[60..64].copy_from_slice(&(112u32).to_le_bytes());
+        data[112..116].copy_from_slice(&(116u32).to_le_bytes());
+        data[116..120].copy_from_slice(&[0x80, 0x80, 0x80, 0x80]);
+
+        let result = DexParser::parse(&data);
+
+        assert!(result.is_err());
     }
 }
 

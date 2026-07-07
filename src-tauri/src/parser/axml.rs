@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::io::Cursor;
+
 use byteorder::{LittleEndian, ReadBytesExt};
 
 /// AXML chunk types
@@ -47,21 +47,22 @@ pub fn decode(data: &[u8]) -> Result<AxmlElement, String> {
     let mut cursor = Cursor::new(data);
 
     // Read file header
-    let chunk_type = cursor.read_u16::<LittleEndian>()
+    let chunk_type = cursor
+        .read_u16::<LittleEndian>()
         .map_err(|e| format!("Failed to read chunk type: {}", e))?;
     if chunk_type != CHUNK_AXML_FILE {
         return Err(format!("Invalid AXML magic: 0x{:04X}", chunk_type));
     }
-    let _header_size = cursor.read_u16::<LittleEndian>()
+    let _header_size = cursor
+        .read_u16::<LittleEndian>()
         .map_err(|e| format!("Failed to read header size: {}", e))?;
-    let _file_size = cursor.read_u32::<LittleEndian>()
+    let _file_size = cursor
+        .read_u32::<LittleEndian>()
         .map_err(|e| format!("Failed to read file size: {}", e))?;
 
     // Parse chunks
     let mut strings: Vec<String> = Vec::new();
     let mut resource_map: Vec<u32> = Vec::new();
-    let mut namespaces: HashMap<String, String> = HashMap::new();
-
     // Stack-based element parsing
     let mut root: Option<AxmlElement> = None;
     let mut stack: Vec<AxmlElement> = Vec::new();
@@ -72,16 +73,27 @@ pub fn decode(data: &[u8]) -> Result<AxmlElement, String> {
             break;
         }
 
-        let chunk_type = cursor.read_u16::<LittleEndian>()
+        let chunk_type = cursor
+            .read_u16::<LittleEndian>()
             .map_err(|e| format!("Failed to read chunk type at {}: {}", pos, e))?;
-        let _header_size = cursor.read_u16::<LittleEndian>()
+        let _header_size = cursor
+            .read_u16::<LittleEndian>()
             .map_err(|e| format!("Failed to read header size: {}", e))?;
-        let chunk_size = cursor.read_u32::<LittleEndian>()
+        let chunk_size = cursor
+            .read_u32::<LittleEndian>()
             .map_err(|e| format!("Failed to read chunk size: {}", e))?;
 
-        let chunk_end = pos + chunk_size as usize;
+        if chunk_size < 8 {
+            return Err(format!(
+                "AXML: invalid chunk size {} at {}",
+                chunk_size, pos
+            ));
+        }
+        let chunk_end = pos
+            .checked_add(chunk_size as usize)
+            .ok_or_else(|| format!("AXML: chunk size overflow at {}", pos))?;
         if chunk_end > data.len() {
-            break;
+            return Err(format!("AXML: chunk at {} extends past input", pos));
         }
 
         match chunk_type {
@@ -94,13 +106,6 @@ pub fn decode(data: &[u8]) -> Result<AxmlElement, String> {
                 cursor.set_position(chunk_end as u64);
             }
             CHUNK_XML_START_NAMESPACE => {
-                let _line = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-                let _comment = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-                let prefix_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
-                let uri_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
-                let prefix = strings.get(prefix_idx).cloned().unwrap_or_default();
-                let uri = strings.get(uri_idx).cloned().unwrap_or_default();
-                namespaces.insert(uri, prefix);
                 cursor.set_position(chunk_end as u64);
             }
             CHUNK_XML_END_NAMESPACE => {
@@ -108,18 +113,15 @@ pub fn decode(data: &[u8]) -> Result<AxmlElement, String> {
             }
             CHUNK_XML_START_TAG => {
                 let element = parse_start_tag(&mut cursor, &strings, &resource_map, chunk_end)?;
-                if let Some(parent) = stack.last_mut() {
-                    parent.children.push(element.clone());
-                    stack.push(element);
-                } else {
-                    stack.push(element);
-                }
+                stack.push(element);
                 cursor.set_position(chunk_end as u64);
             }
             CHUNK_XML_END_TAG => {
                 cursor.set_position(chunk_end as u64);
                 if let Some(elem) = stack.pop() {
-                    if stack.is_empty() {
+                    if let Some(parent) = stack.last_mut() {
+                        parent.children.push(elem);
+                    } else {
                         root = Some(elem);
                     }
                 }
@@ -156,29 +158,66 @@ pub fn decode(data: &[u8]) -> Result<AxmlElement, String> {
 fn parse_string_pool(data: &[u8]) -> Result<Vec<String>, String> {
     let mut cursor = Cursor::new(data);
 
-    let _chunk_type = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let _header_size = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let _chunk_size = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+    if data.len() < 28 {
+        return Err("AXML: truncated string pool header".to_string());
+    }
 
-    let string_count = cursor.read_u32::<LittleEndian>().unwrap_or(0) as usize;
-    let _style_count = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-    let flags = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-    let strings_offset = cursor.read_u32::<LittleEndian>().unwrap_or(0) as usize;
-    let _styles_offset = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+    let _chunk_type = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let _header_size = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let _chunk_size = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+
+    let string_count = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+    let _style_count = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let flags = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let strings_offset = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+    let _styles_offset = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+
+    let offsets_end = 28usize
+        .checked_add(string_count.saturating_mul(4))
+        .ok_or_else(|| "AXML: string offset table overflow".to_string())?;
+    if offsets_end > data.len() || strings_offset > data.len() {
+        return Err("AXML: invalid string pool bounds".to_string());
+    }
 
     let is_utf8 = (flags & (1 << 8)) != 0;
 
     // Read string offsets
     let mut offsets = Vec::with_capacity(string_count);
     for _ in 0..string_count {
-        offsets.push(cursor.read_u32::<LittleEndian>().unwrap_or(0) as usize);
+        offsets.push(
+            cursor
+                .read_u32::<LittleEndian>()
+                .map_err(|e| e.to_string())? as usize,
+        );
     }
 
     let strings_start = strings_offset;
     let mut strings = Vec::with_capacity(string_count);
 
     for i in 0..string_count {
-        let offset = strings_start + offsets.get(i).unwrap_or(&0);
+        let offset = match strings_start.checked_add(offsets[i]) {
+            Some(offset) => offset,
+            None => {
+                strings.push(String::new());
+                continue;
+            }
+        };
         if offset >= data.len() {
             strings.push(String::new());
             continue;
@@ -196,7 +235,7 @@ fn parse_string_pool(data: &[u8]) -> Result<Vec<String>, String> {
 }
 
 fn read_utf8_string(data: &[u8]) -> String {
-    if data.is_empty() {
+    if data.len() < 2 {
         return String::new();
     }
 
@@ -205,6 +244,9 @@ fn read_utf8_string(data: &[u8]) -> String {
     let len_byte = data[pos];
     pos += 1;
     let len = if len_byte & 0x80 != 0 {
+        if pos >= data.len() {
+            return String::new();
+        }
         let len_byte2 = data[pos];
         pos += 1;
         ((len_byte as usize & 0x7F) << 8) | len_byte2 as usize
@@ -213,13 +255,19 @@ fn read_utf8_string(data: &[u8]) -> String {
     };
 
     // Skip the second length field (same encoding, for UTF-8 encoded bytes count)
+    if pos >= data.len() {
+        return String::new();
+    }
     let _encoded_len_byte = data[pos];
     pos += 1;
     if _encoded_len_byte & 0x80 != 0 {
+        if pos >= data.len() {
+            return String::new();
+        }
         pos += 1;
     }
 
-    if pos + len > data.len() {
+    if pos.checked_add(len).map_or(true, |end| end > data.len()) {
         return String::new();
     }
 
@@ -245,8 +293,14 @@ fn read_utf16_string(data: &[u8]) -> String {
         len_word
     };
 
-    let byte_len = len * 2;
-    if pos + byte_len > data.len() {
+    let byte_len = match len.checked_mul(2) {
+        Some(byte_len) => byte_len,
+        None => return String::new(),
+    };
+    if pos
+        .checked_add(byte_len)
+        .map_or(true, |end| end > data.len())
+    {
         return String::new();
     }
 
@@ -270,17 +324,52 @@ fn parse_start_tag(
     _resource_map: &[u32],
     _chunk_end: usize,
 ) -> Result<AxmlElement, String> {
-    let _line = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-    let _comment = cursor.read_u32::<LittleEndian>().unwrap_or(0);
-    let ns_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
-    let name_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
+    let start = cursor.position() as usize;
+    if start.checked_add(28).map_or(true, |end| end > _chunk_end) {
+        return Err("AXML: truncated start tag".to_string());
+    }
 
-    let _attr_start = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let _attr_size = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let attr_count = cursor.read_u16::<LittleEndian>().unwrap_or(0) as usize;
-    let _id_idx = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let _class_idx = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-    let _style_idx = cursor.read_u16::<LittleEndian>().unwrap_or(0);
+    let _line = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let _comment = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let ns_idx = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+    let name_idx = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+
+    let _attr_start = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let attr_size = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+    let attr_count = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())? as usize;
+    let _id_idx = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let _class_idx = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+    let _style_idx = cursor
+        .read_u16::<LittleEndian>()
+        .map_err(|e| e.to_string())?;
+
+    let attr_size = attr_size.max(20);
+    let attrs_end = cursor
+        .position()
+        .checked_add((attr_count.saturating_mul(attr_size)) as u64)
+        .and_then(|pos| usize::try_from(pos).ok())
+        .ok_or_else(|| "AXML: attribute table overflow".to_string())?;
+    if attrs_end > _chunk_end {
+        return Err("AXML: attributes extend past start tag".to_string());
+    }
 
     let name = strings.get(name_idx).cloned().unwrap_or_default();
     let namespace = if ns_idx == 0xFFFFFFFF {
@@ -292,14 +381,24 @@ fn parse_start_tag(
     let mut attributes = Vec::with_capacity(attr_count);
 
     for _ in 0..attr_count {
-        let attr_ns_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
-        let attr_name_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
-        let attr_raw_value_idx = cursor.read_u32::<LittleEndian>().unwrap_or(0xFFFFFFFF) as usize;
+        let attr_ns_idx = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| e.to_string())? as usize;
+        let attr_name_idx = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| e.to_string())? as usize;
+        let attr_raw_value_idx = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| e.to_string())? as usize;
 
-        let _typed_size = cursor.read_u16::<LittleEndian>().unwrap_or(0);
-        let _typed_res0 = cursor.read_u8().unwrap_or(0);
-        let typed_type = cursor.read_u8().unwrap_or(0);
-        let typed_data = cursor.read_u32::<LittleEndian>().unwrap_or(0);
+        let _typed_size = cursor
+            .read_u16::<LittleEndian>()
+            .map_err(|e| e.to_string())?;
+        let _typed_res0 = cursor.read_u8().map_err(|e| e.to_string())?;
+        let typed_type = cursor.read_u8().map_err(|e| e.to_string())?;
+        let typed_data = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| e.to_string())?;
 
         let attr_name = strings.get(attr_name_idx).cloned().unwrap_or_default();
         let attr_ns = if attr_ns_idx == 0xFFFFFFFF {
@@ -351,7 +450,11 @@ fn type_to_string(typed_type: u8, typed_data: u32) -> String {
         ATTR_TYPE_INT_DEC => format!("{}", typed_data as i32),
         ATTR_TYPE_INT_HEX => format!("0x{:08X}", typed_data),
         ATTR_TYPE_INT_BOOL => {
-            if typed_data != 0 { "true".to_string() } else { "false".to_string() }
+            if typed_data != 0 {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
         }
         ATTR_TYPE_DIMENSION => format!("dimension({})", typed_data),
         ATTR_TYPE_FRACTION => format!("fraction({})", typed_data),
@@ -378,7 +481,8 @@ fn element_to_xml(element: &AxmlElement, output: &mut String, indent: usize) {
         output.push_str(&attr.name);
         output.push_str("=\"");
         // Escape XML special chars
-        let escaped = attr.value
+        let escaped = attr
+            .value
             .replace('&', "&amp;")
             .replace('<', "&lt;")
             .replace('>', "&gt;")
@@ -410,5 +514,108 @@ fn element_to_xml(element: &AxmlElement, output: &mut String, indent: usize) {
         output.push_str("</");
         output.push_str(&element.name);
         output.push_str(">\n");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn push_u16(out: &mut Vec<u8>, value: u16) {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u32(out: &mut Vec<u8>, value: u32) {
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn string_pool(strings: &[&str]) -> Vec<u8> {
+        let header_size = 28usize;
+        let offsets_size = strings.len() * 4;
+        let strings_offset = header_size + offsets_size;
+        let mut string_data = Vec::new();
+        let mut offsets = Vec::new();
+
+        for value in strings {
+            offsets.push(string_data.len() as u32);
+            string_data.push(value.len() as u8);
+            string_data.push(value.len() as u8);
+            string_data.extend_from_slice(value.as_bytes());
+            string_data.push(0);
+        }
+
+        let chunk_size = strings_offset + string_data.len();
+        let mut out = Vec::new();
+        push_u16(&mut out, CHUNK_STRING_POOL);
+        push_u16(&mut out, header_size as u16);
+        push_u32(&mut out, chunk_size as u32);
+        push_u32(&mut out, strings.len() as u32);
+        push_u32(&mut out, 0);
+        push_u32(&mut out, 1 << 8);
+        push_u32(&mut out, strings_offset as u32);
+        push_u32(&mut out, 0);
+        for offset in offsets {
+            push_u32(&mut out, offset);
+        }
+        out.extend_from_slice(&string_data);
+        out
+    }
+
+    fn start_tag(name_idx: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        push_u16(&mut out, CHUNK_XML_START_TAG);
+        push_u16(&mut out, 16);
+        push_u32(&mut out, 36);
+        push_u32(&mut out, 0);
+        push_u32(&mut out, 0xFFFF_FFFF);
+        push_u32(&mut out, 0xFFFF_FFFF);
+        push_u32(&mut out, name_idx);
+        push_u16(&mut out, 20);
+        push_u16(&mut out, 20);
+        push_u16(&mut out, 0);
+        push_u16(&mut out, 0);
+        push_u16(&mut out, 0);
+        push_u16(&mut out, 0);
+        out
+    }
+
+    fn end_tag() -> Vec<u8> {
+        let mut out = Vec::new();
+        push_u16(&mut out, CHUNK_XML_END_TAG);
+        push_u16(&mut out, 16);
+        push_u32(&mut out, 24);
+        out.resize(24, 0);
+        out
+    }
+
+    #[test]
+    fn decode_preserves_nested_children_when_end_tags_close() {
+        let mut data = Vec::new();
+        push_u16(&mut data, CHUNK_AXML_FILE);
+        push_u16(&mut data, 8);
+        push_u32(&mut data, 0);
+        data.extend_from_slice(&string_pool(&["manifest", "application", "activity"]));
+        data.extend_from_slice(&start_tag(0));
+        data.extend_from_slice(&start_tag(1));
+        data.extend_from_slice(&start_tag(2));
+        data.extend_from_slice(&end_tag());
+        data.extend_from_slice(&end_tag());
+        data.extend_from_slice(&end_tag());
+
+        let root = decode(&data).expect("valid synthetic AXML should decode");
+
+        assert_eq!(root.name, "manifest");
+        assert_eq!(root.children.len(), 1);
+        assert_eq!(root.children[0].name, "application");
+        assert_eq!(root.children[0].children.len(), 1);
+        assert_eq!(root.children[0].children[0].name, "activity");
+    }
+
+    #[test]
+    fn read_utf8_string_returns_empty_when_length_field_is_truncated() {
+        let result = std::panic::catch_unwind(|| read_utf8_string(&[0x81]));
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap_or_default(), "");
     }
 }

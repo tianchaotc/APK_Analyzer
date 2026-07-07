@@ -1,14 +1,15 @@
-use crate::parser::ApkReader;
 use crate::parser::axml;
+use crate::parser::ApkReader;
 
 /// Get app name from manifest label or resource lookup
-pub fn get_app_name(apk: &mut ApkReader, element: &axml::AxmlElement) -> String {
+pub fn get_app_name(_apk: &mut ApkReader, element: &axml::AxmlElement) -> String {
     let app = match element.find("application") {
         Some(a) => a,
         None => return element.get_attr("package").unwrap_or_default(),
     };
 
-    let label = app.get_attr("android:label")
+    let label = app
+        .get_attr("android:label")
         .or_else(|| app.get_attr("label"))
         .unwrap_or_default();
 
@@ -16,7 +17,9 @@ pub fn get_app_name(apk: &mut ApkReader, element: &axml::AxmlElement) -> String 
     // For now, if it starts with @, we can't easily resolve without full arsc parsing
     // Return the package name as fallback
     if label.is_empty() || label.starts_with('@') {
-        element.get_attr("package").unwrap_or_else(|| "Unknown".to_string())
+        element
+            .get_attr("package")
+            .unwrap_or_else(|| "Unknown".to_string())
     } else {
         label
     }
@@ -29,15 +32,18 @@ pub fn get_sdk_versions(element: &axml::AxmlElement) -> (u32, u32, u32) {
     let mut compile_sdk = 0u32;
 
     if let Some(uses_sdk) = element.find("uses-sdk") {
-        min_sdk = uses_sdk.get_attr("android:minSdk")
+        min_sdk = uses_sdk
+            .get_attr("android:minSdk")
             .or_else(|| uses_sdk.get_attr("minSdk"))
             .and_then(|v| v.parse().ok())
             .unwrap_or(1);
-        target_sdk = uses_sdk.get_attr("android:targetSdk")
+        target_sdk = uses_sdk
+            .get_attr("android:targetSdk")
             .or_else(|| uses_sdk.get_attr("targetSdk"))
             .and_then(|v| v.parse().ok())
             .unwrap_or(min_sdk);
-        compile_sdk = uses_sdk.get_attr("android:compileSdk")
+        compile_sdk = uses_sdk
+            .get_attr("android:compileSdk")
             .or_else(|| uses_sdk.get_attr("compileSdk"))
             .and_then(|v| v.parse().ok())
             .unwrap_or(0);
@@ -48,11 +54,16 @@ pub fn get_sdk_versions(element: &axml::AxmlElement) -> (u32, u32, u32) {
 
 /// Collect ABIs from lib/ directories
 pub fn collect_abis(file_names: &[String]) -> Vec<String> {
-    let mut abis: Vec<String> = file_names.iter()
+    let mut abis: Vec<String> = file_names
+        .iter()
         .filter(|f| f.starts_with("lib/"))
         .filter_map(|f| {
             let parts: Vec<&str> = f.splitn(3, '/').collect();
-            if parts.len() >= 2 { Some(parts[1].to_string()) } else { None }
+            if parts.len() >= 2 {
+                Some(parts[1].to_string())
+            } else {
+                None
+            }
         })
         .collect();
     abis.sort();
@@ -63,15 +74,19 @@ pub fn collect_abis(file_names: &[String]) -> Vec<String> {
 /// Collect screen densities from res/ directories
 pub fn collect_densities(file_names: &[String]) -> Vec<String> {
     let density_suffixes = [
-        "ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi",
-        "nodpi", "tvdpi", "anydpi",
+        "ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi", "nodpi", "tvdpi", "anydpi",
     ];
 
-    let mut densities: Vec<String> = file_names.iter()
+    let mut densities: Vec<String> = file_names
+        .iter()
         .filter_map(|f| {
-            if !f.starts_with("res/") { return None; }
+            if !f.starts_with("res/") {
+                return None;
+            }
             let parts: Vec<&str> = f.split('/').collect();
-            if parts.len() < 2 { return None; }
+            if parts.len() < 2 {
+                return None;
+            }
             let dir = parts[1];
             for suffix in &density_suffixes {
                 if dir == *suffix || dir.ends_with(&format!("-{}", suffix)) {
@@ -88,9 +103,12 @@ pub fn collect_densities(file_names: &[String]) -> Vec<String> {
 
 /// Collect languages from res/values-*/
 pub fn collect_languages(file_names: &[String]) -> Vec<String> {
-    let mut langs: Vec<String> = file_names.iter()
+    let mut langs: Vec<String> = file_names
+        .iter()
         .filter_map(|f| {
-            if !f.starts_with("res/values-") { return None; }
+            if !f.starts_with("res/values-") {
+                return None;
+            }
             let rest = f.strip_prefix("res/values-").unwrap_or("");
             let dir = rest.split('/').next().unwrap_or("");
             // Language codes are like "en", "zh-rCN", "de"
@@ -109,13 +127,16 @@ pub fn collect_languages(file_names: &[String]) -> Vec<String> {
 
 /// Check if this is a split APK
 pub fn is_split_apk(file_names: &[String]) -> bool {
-    file_names.iter().any(|f| f.starts_with("assets/split_") || f.contains("config."))
+    file_names
+        .iter()
+        .any(|f| f.starts_with("assets/split_") || f.contains("config."))
 }
 
 /// Get app icon as base64
 pub fn get_app_icon_base64(apk: &mut ApkReader, element: &axml::AxmlElement) -> Option<String> {
     let app = element.find("application")?;
-    let icon_ref = app.get_attr("android:icon")
+    let _icon_ref = app
+        .get_attr("android:icon")
         .or_else(|| app.get_attr("icon"))
         .or_else(|| app.get_attr("android:roundIcon"))
         .or_else(|| app.get_attr("roundIcon"))?;

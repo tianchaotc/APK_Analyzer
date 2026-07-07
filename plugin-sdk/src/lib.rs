@@ -306,16 +306,22 @@ macro_rules! export_plugin {
                 return -2;
             }
             let api = unsafe { &*host };
-            let path_bytes = unsafe {
-                std::slice::from_raw_parts(apk_path as *const u8, apk_path_len)
-            };
+            let path_bytes =
+                unsafe { std::slice::from_raw_parts(apk_path as *const u8, apk_path_len) };
             let apk_path = match std::str::from_utf8(path_bytes) {
                 Ok(s) => s,
                 Err(_) => return -2,
             };
             let host_wrapper = HostApiWrapper::new(api);
-            match PLUGIN_INSTANCE.analyze(&host_wrapper, apk_path) {
-                Ok(value) => {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                PLUGIN_INSTANCE.analyze(&host_wrapper, apk_path)
+            }));
+            match result {
+                Err(_) => {
+                    host_wrapper.log($crate::LogLevel::Error, "plugin panicked during analyze");
+                    -1
+                }
+                Ok(Ok(value)) => {
                     let json = value.to_string();
                     let (ptr, len) = $crate::alloc_plugin_bytes(json.as_bytes());
                     if ptr.is_null() && !json.is_empty() {
@@ -327,7 +333,7 @@ macro_rules! export_plugin {
                     }
                     0
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     let msg = format!("{}", e);
                     host_wrapper.log($crate::LogLevel::Error, &msg);
                     -1
@@ -340,7 +346,16 @@ macro_rules! export_plugin {
             out_len: *mut usize,
         ) -> std::os::raw::c_int {
             use $crate::Plugin;
-            let schema = PLUGIN_INSTANCE.ui_schema();
+            if out.is_null() || out_len.is_null() {
+                return -2;
+            }
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                PLUGIN_INSTANCE.ui_schema()
+            }));
+            let schema = match result {
+                Ok(schema) => schema,
+                Err(_) => return -1,
+            };
             let json = schema.to_string();
             let (ptr, len) = $crate::alloc_plugin_bytes(json.as_bytes());
             if ptr.is_null() && !json.is_empty() {
@@ -357,4 +372,144 @@ macro_rules! export_plugin {
             unsafe { $crate::free_plugin_buffer(ptr, len) };
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ptr;
+
+    struct PanickingPlugin;
+
+    impl PanickingPlugin {
+        const fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Plugin for PanickingPlugin {
+        fn metadata(&self) -> Metadata {
+            Metadata {
+                id: "panic".to_string(),
+                name: "Panic".to_string(),
+                version: "1.0.0".to_string(),
+                author: "test".to_string(),
+                description: "panic test".to_string(),
+            }
+        }
+
+        fn analyze(
+            &self,
+            _host: &dyn Host,
+            _apk_path: &str,
+        ) -> Result<serde_json::Value, HostError> {
+            panic!("analyze panic")
+        }
+
+        fn ui_schema(&self) -> serde_json::Value {
+            panic!("schema panic")
+        }
+    }
+
+    export_plugin!(PanickingPlugin);
+
+    extern "C" fn read_apk_file(
+        _ctx: *const c_void,
+        _path: *const c_char,
+        _path_len: usize,
+        _out: *mut *mut u8,
+        _out_len: *mut usize,
+    ) -> i32 {
+        -4
+    }
+
+    extern "C" fn list_apk_files(
+        _ctx: *const c_void,
+        _out: *mut *mut c_char,
+        _out_len: *mut usize,
+    ) -> i32 {
+        -1
+    }
+
+    extern "C" fn parse_axml(
+        _ctx: *const c_void,
+        _bytes: *const u8,
+        _len: usize,
+        _out: *mut *mut c_char,
+        _out_len: *mut usize,
+    ) -> i32 {
+        -1
+    }
+
+    extern "C" fn parse_dex(
+        _ctx: *const c_void,
+        _bytes: *const u8,
+        _len: usize,
+        _out: *mut *mut c_char,
+        _out_len: *mut usize,
+    ) -> i32 {
+        -1
+    }
+
+    extern "C" fn get_analysis(
+        _ctx: *const c_void,
+        _key: *const c_char,
+        _key_len: usize,
+        _out: *mut *mut c_char,
+        _out_len: *mut usize,
+    ) -> i32 {
+        -1
+    }
+
+    extern "C" fn log(_ctx: *const c_void, _level: i32, _msg: *const c_char, _msg_len: usize) {}
+
+    extern "C" fn free_host(_ptr: *mut c_void, _len: usize) {}
+
+    fn host_api() -> HostApi {
+        HostApi {
+            abi_version: ABI_VERSION,
+            ctx: ptr::null(),
+            read_apk_file,
+            list_apk_files,
+            parse_axml,
+            parse_dex,
+            get_analysis,
+            log,
+            free_host,
+        }
+    }
+
+    #[test]
+    fn ffi_analyze_returns_error_when_plugin_panics() {
+        let vtable = unsafe { &*apk_analyzer_plugin_vtable() };
+        let host = host_api();
+        let path = b"sample.apk";
+        let mut out: *mut c_char = ptr::null_mut();
+        let mut out_len = 0usize;
+
+        let rc = (vtable.analyze)(
+            &host,
+            path.as_ptr() as *const c_char,
+            path.len(),
+            &mut out,
+            &mut out_len,
+        );
+
+        assert_eq!(rc, -1);
+        assert!(out.is_null());
+        assert_eq!(out_len, 0);
+    }
+
+    #[test]
+    fn ffi_ui_schema_returns_error_when_plugin_panics() {
+        let vtable = unsafe { &*apk_analyzer_plugin_vtable() };
+        let mut out: *mut c_char = ptr::null_mut();
+        let mut out_len = 0usize;
+
+        let rc = (vtable.ui_schema)(&mut out, &mut out_len);
+
+        assert_eq!(rc, -1);
+        assert!(out.is_null());
+        assert_eq!(out_len, 0);
+    }
 }

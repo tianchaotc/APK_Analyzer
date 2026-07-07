@@ -5,29 +5,25 @@ use std::io::Write;
 pub fn export_json(analysis: &ApkAnalysis, path: &str) -> Result<String, String> {
     let json = serde_json::to_string_pretty(analysis)
         .map_err(|e| format!("Failed to serialize: {}", e))?;
-    fs::write(path, json)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(path.to_string())
 }
 
 pub fn export_markdown(analysis: &ApkAnalysis, path: &str) -> Result<String, String> {
     let md = generate_markdown(analysis);
-    fs::write(path, md)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(path, md).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(path.to_string())
 }
 
 pub fn export_html(analysis: &ApkAnalysis, path: &str) -> Result<String, String> {
     let html = generate_html(analysis);
-    fs::write(path, html)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    fs::write(path, html).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(path.to_string())
 }
 
 pub fn export_csv(analysis: &ApkAnalysis, path: &str) -> Result<String, String> {
     let csv = generate_csv(analysis);
-    let mut file = fs::File::create(path)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+    let mut file = fs::File::create(path).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(csv.as_bytes())
         .map_err(|e| format!("Failed to write: {}", e))?;
     Ok(path.to_string())
@@ -38,7 +34,10 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
 
     md.push_str(&format!("# APK Analysis Report\n\n"));
     md.push_str(&format!("**File:** {}\n\n", a.file_name));
-    md.push_str(&format!("**Size:** {:.2} MB\n\n", a.file_size as f64 / 1_048_576.0));
+    md.push_str(&format!(
+        "**Size:** {:.2} MB\n\n",
+        a.file_size as f64 / 1_048_576.0
+    ));
     md.push_str(&format!("**Analyzed:** {}\n\n", a.analyzed_at));
     md.push_str("---\n\n");
 
@@ -46,33 +45,55 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
     md.push_str("## Overview\n\n");
     md.push_str(&format!("- **App Name:** {}\n", a.overview.app_name));
     md.push_str(&format!("- **Package:** {}\n", a.overview.package_name));
-    md.push_str(&format!("- **Version:** {} (code: {})\n", a.overview.version_name, a.overview.version_code));
+    md.push_str(&format!(
+        "- **Version:** {} (code: {})\n",
+        a.overview.version_name, a.overview.version_code
+    ));
     md.push_str(&format!("- **Min SDK:** {}\n", a.overview.min_sdk));
     md.push_str(&format!("- **Target SDK:** {}\n", a.overview.target_sdk));
     md.push_str(&format!("- **ABIs:** {}\n", a.overview.abis.join(", ")));
-    md.push_str(&format!("- **Languages:** {}\n", a.overview.languages.join(", ")));
+    md.push_str(&format!(
+        "- **Languages:** {}\n",
+        a.overview.languages.join(", ")
+    ));
     md.push_str(&format!("- **Debuggable:** {}\n", a.overview.debuggable));
-    md.push_str(&format!("- **Allow Backup:** {}\n", a.overview.allow_backup));
-    md.push_str(&format!("- **Cleartext Traffic:** {}\n\n", a.overview.uses_cleartext_traffic));
+    md.push_str(&format!(
+        "- **Allow Backup:** {}\n",
+        a.overview.allow_backup
+    ));
+    md.push_str(&format!(
+        "- **Cleartext Traffic:** {}\n\n",
+        a.overview.uses_cleartext_traffic
+    ));
 
     // Permissions
     md.push_str("## Permissions\n\n");
-    md.push_str(&format!("Total: {} (Normal: {}, Dangerous: {}, Signature: {}, Special: {})\n\n",
-        a.permissions.summary.total, a.permissions.summary.normal,
-        a.permissions.summary.dangerous, a.permissions.summary.signature,
-        a.permissions.summary.special));
+    md.push_str(&format!(
+        "Total: {} (Normal: {}, Dangerous: {}, Signature: {}, Special: {})\n\n",
+        a.permissions.summary.total,
+        a.permissions.summary.normal,
+        a.permissions.summary.dangerous,
+        a.permissions.summary.signature,
+        a.permissions.summary.special
+    ));
     if !a.permissions.permissions.is_empty() {
         md.push_str("| Permission | Level | Risk | Category |\n");
         md.push_str("|------------|-------|------|----------|\n");
         for p in &a.permissions.permissions {
-            md.push_str(&format!("| {} | {} | {} | {} |\n", p.name, p.protection_level, p.risk_level, p.category));
+            md.push_str(&format!(
+                "| {} | {} | {} | {} |\n",
+                p.name, p.protection_level, p.risk_level, p.category
+            ));
         }
         md.push_str("\n");
     }
 
     // Components
     md.push_str("## Components\n\n");
-    md.push_str(&format!("- Activities: {}\n", a.components.stats.activities));
+    md.push_str(&format!(
+        "- Activities: {}\n",
+        a.components.stats.activities
+    ));
     md.push_str(&format!("- Services: {}\n", a.components.stats.services));
     md.push_str(&format!("- Receivers: {}\n", a.components.stats.receivers));
     md.push_str(&format!("- Providers: {}\n", a.components.stats.providers));
@@ -81,8 +102,12 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
     if !a.components.exported_components.is_empty() {
         md.push_str("### Exported Components\n\n");
         for ec in &a.components.exported_components {
-            md.push_str(&format!("- **{}** ({}) - Permission: {}\n", ec.name, ec.component_type,
-                ec.permission.as_ref().unwrap_or(&"none".to_string())));
+            md.push_str(&format!(
+                "- **{}** ({}) - Permission: {}\n",
+                ec.name,
+                ec.component_type,
+                ec.permission.as_ref().unwrap_or(&"none".to_string())
+            ));
         }
         md.push_str("\n");
     }
@@ -90,11 +115,24 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
     // Native Libraries
     if a.native_libs.summary.total > 0 {
         md.push_str("## Native Libraries\n\n");
-        md.push_str(&format!("Total: {} ({} ABIs)\n\n", a.native_libs.summary.total, a.native_libs.summary.abis.len()));
+        md.push_str(&format!(
+            "Total: {} ({} ABIs)\n\n",
+            a.native_libs.summary.total,
+            a.native_libs.summary.abis.len()
+        ));
         for group in &a.native_libs.by_abi {
-            md.push_str(&format!("### {} ({} files, {:.2} MB)\n\n", group.abi, group.count, group.total_size as f64 / 1_048_576.0));
+            md.push_str(&format!(
+                "### {} ({} files, {:.2} MB)\n\n",
+                group.abi,
+                group.count,
+                group.total_size as f64 / 1_048_576.0
+            ));
             for lib in &group.libraries {
-                md.push_str(&format!("- {} ({:.2} KB)\n", lib.file_name, lib.size as f64 / 1024.0));
+                md.push_str(&format!(
+                    "- {} ({:.2} KB)\n",
+                    lib.file_name,
+                    lib.size as f64 / 1024.0
+                ));
             }
             md.push_str("\n");
         }
@@ -103,14 +141,29 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
     // DEX
     md.push_str("## DEX Analysis\n\n");
     md.push_str(&format!("- DEX files: {}\n", a.dex.summary.total_dex_files));
-    md.push_str(&format!("- Total classes: {}\n", a.dex.summary.total_classes));
-    md.push_str(&format!("- Total methods: {}\n", a.dex.summary.total_methods));
-    md.push_str(&format!("- Total fields: {}\n\n", a.dex.summary.total_fields));
+    md.push_str(&format!(
+        "- Total classes: {}\n",
+        a.dex.summary.total_classes
+    ));
+    md.push_str(&format!(
+        "- Total methods: {}\n",
+        a.dex.summary.total_methods
+    ));
+    md.push_str(&format!(
+        "- Total fields: {}\n\n",
+        a.dex.summary.total_fields
+    ));
 
     // Certificate
     md.push_str("## Certificate\n\n");
-    md.push_str(&format!("- Signature scheme: {}\n", a.certificate.signature_scheme));
-    md.push_str(&format!("- Debug certificate: {}\n", a.certificate.is_debug_certificate));
+    md.push_str(&format!(
+        "- Signature scheme: {}\n",
+        a.certificate.signature_scheme
+    ));
+    md.push_str(&format!(
+        "- Debug certificate: {}\n",
+        a.certificate.is_debug_certificate
+    ));
     md.push_str(&format!("- Expired: {}\n\n", a.certificate.is_expired));
     for signer in &a.certificate.signers {
         md.push_str(&format!("### Signer\n\n"));
@@ -119,7 +172,10 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
         md.push_str(&format!("- **SHA1:** {}\n", signer.sha1));
         md.push_str(&format!("- **SHA256:** {}\n", signer.sha256));
         md.push_str(&format!("- **MD5:** {}\n", signer.md5));
-        md.push_str(&format!("- **Valid:** {} to {}\n\n", signer.not_before, signer.not_after));
+        md.push_str(&format!(
+            "- **Valid:** {} to {}\n\n",
+            signer.not_before, signer.not_after
+        ));
     }
 
     // Security
@@ -129,7 +185,10 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
         md.push_str("| Severity | Title | Recommendation |\n");
         md.push_str("|----------|-------|----------------|\n");
         for issue in &a.security.issues {
-            md.push_str(&format!("| {} | {} | {} |\n", issue.severity, issue.title, issue.recommendation));
+            md.push_str(&format!(
+                "| {} | {} | {} |\n",
+                issue.severity, issue.title, issue.recommendation
+            ));
         }
         md.push_str("\n");
     }
@@ -141,7 +200,12 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
         md.push_str(&format!("**App Type:** {}\n\n", ai.app_type));
         md.push_str("### Technology Stack\n\n");
         for ts in &ai.tech_stack {
-            md.push_str(&format!("- **{}** ({} confidence) - {}\n", ts.name, ts.confidence, ts.evidence.join("; ")));
+            md.push_str(&format!(
+                "- **{}** ({} confidence) - {}\n",
+                ts.name,
+                ts.confidence,
+                ts.evidence.join("; ")
+            ));
         }
         md.push_str("\n");
         if !ai.potential_risks.is_empty() {
@@ -158,14 +222,17 @@ fn generate_markdown(a: &ApkAnalysis) -> String {
 
 fn generate_html(a: &ApkAnalysis) -> String {
     let mut html = String::new();
+    let title = html_escape(&a.overview.app_name);
 
     html.push_str("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n");
     html.push_str("<meta charset=\"UTF-8\">\n");
     html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n");
-    html.push_str(&format!("<title>APK Analysis - {}</title>\n", a.overview.app_name));
+    html.push_str(&format!("<title>APK Analysis - {}</title>\n", title));
     html.push_str("<style>\n");
     html.push_str("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px; color: #333; line-height: 1.6; }\n");
-    html.push_str("h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }\n");
+    html.push_str(
+        "h1 { color: #1a1a1a; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; }\n",
+    );
     html.push_str("h2 { color: #2c3e50; margin-top: 30px; }\n");
     html.push_str("table { border-collapse: collapse; width: 100%; margin: 10px 0; }\n");
     html.push_str("th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }\n");
@@ -177,47 +244,94 @@ fn generate_html(a: &ApkAnalysis) -> String {
 
     html.push_str(&format!("<h1>APK Analysis Report</h1>\n"));
     html.push_str(&format!("<p><strong>File:</strong> {} | <strong>Size:</strong> {:.2} MB | <strong>Analyzed:</strong> {}</p>\n",
-        a.file_name, a.file_size as f64 / 1_048_576.0, a.analyzed_at));
+        html_escape(&a.file_name), a.file_size as f64 / 1_048_576.0, html_escape(&a.analyzed_at)));
 
     // Overview
     html.push_str("<h2>Overview</h2>\n<table>\n");
-    html.push_str(&format!("<tr><th>App Name</th><td>{}</td></tr>\n", a.overview.app_name));
-    html.push_str(&format!("<tr><th>Package</th><td>{}</td></tr>\n", a.overview.package_name));
-    html.push_str(&format!("<tr><th>Version</th><td>{} (code: {})</td></tr>\n", a.overview.version_name, a.overview.version_code));
-    html.push_str(&format!("<tr><th>SDK</th><td>Min: {} / Target: {}</td></tr>\n", a.overview.min_sdk, a.overview.target_sdk));
-    html.push_str(&format!("<tr><th>ABIs</th><td>{}</td></tr>\n", a.overview.abis.join(", ")));
+    html.push_str(&format!(
+        "<tr><th>App Name</th><td>{}</td></tr>\n",
+        html_escape(&a.overview.app_name)
+    ));
+    html.push_str(&format!(
+        "<tr><th>Package</th><td>{}</td></tr>\n",
+        html_escape(&a.overview.package_name)
+    ));
+    html.push_str(&format!(
+        "<tr><th>Version</th><td>{} (code: {})</td></tr>\n",
+        html_escape(&a.overview.version_name),
+        html_escape(&a.overview.version_code)
+    ));
+    html.push_str(&format!(
+        "<tr><th>SDK</th><td>Min: {} / Target: {}</td></tr>\n",
+        html_escape(&a.overview.min_sdk),
+        html_escape(&a.overview.target_sdk)
+    ));
+    html.push_str(&format!(
+        "<tr><th>ABIs</th><td>{}</td></tr>\n",
+        html_escape(&a.overview.abis.join(", "))
+    ));
     html.push_str("</table>\n");
 
     // Permissions
     html.push_str("<h2>Permissions</h2>\n");
-    html.push_str(&format!("<p>Total: {} | Dangerous: {} | Normal: {}</p>\n",
-        a.permissions.summary.total, a.permissions.summary.dangerous, a.permissions.summary.normal));
+    html.push_str(&format!(
+        "<p>Total: {} | Dangerous: {} | Normal: {}</p>\n",
+        a.permissions.summary.total, a.permissions.summary.dangerous, a.permissions.summary.normal
+    ));
     if !a.permissions.permissions.is_empty() {
         html.push_str("<table><tr><th>Permission</th><th>Level</th><th>Risk</th></tr>\n");
         for p in &a.permissions.permissions {
-            html.push_str(&format!("<tr><td>{}</td><td>{}</td><td class=\"{}\">{}</td></tr>\n",
-                p.name, p.protection_level, p.risk_level, p.risk_level));
+            html.push_str(&format!(
+                "<tr><td>{}</td><td>{}</td><td class=\"{}\">{}</td></tr>\n",
+                html_escape(&p.name),
+                html_escape(&p.protection_level),
+                html_class(&p.risk_level),
+                html_escape(&p.risk_level)
+            ));
         }
         html.push_str("</table>\n");
     }
 
     // Components
     html.push_str("<h2>Components</h2>\n<table>\n");
-    html.push_str(&format!("<tr><th>Activities</th><td>{}</td></tr>\n", a.components.stats.activities));
-    html.push_str(&format!("<tr><th>Services</th><td>{}</td></tr>\n", a.components.stats.services));
-    html.push_str(&format!("<tr><th>Receivers</th><td>{}</td></tr>\n", a.components.stats.receivers));
-    html.push_str(&format!("<tr><th>Providers</th><td>{}</td></tr>\n", a.components.stats.providers));
-    html.push_str(&format!("<tr><th>Exported</th><td>{}</td></tr>\n", a.components.stats.exported));
+    html.push_str(&format!(
+        "<tr><th>Activities</th><td>{}</td></tr>\n",
+        a.components.stats.activities
+    ));
+    html.push_str(&format!(
+        "<tr><th>Services</th><td>{}</td></tr>\n",
+        a.components.stats.services
+    ));
+    html.push_str(&format!(
+        "<tr><th>Receivers</th><td>{}</td></tr>\n",
+        a.components.stats.receivers
+    ));
+    html.push_str(&format!(
+        "<tr><th>Providers</th><td>{}</td></tr>\n",
+        a.components.stats.providers
+    ));
+    html.push_str(&format!(
+        "<tr><th>Exported</th><td>{}</td></tr>\n",
+        a.components.stats.exported
+    ));
     html.push_str("</table>\n");
 
     // Security
     html.push_str("<h2>Security</h2>\n");
-    html.push_str(&format!("<p class=\"score\">Score: {}/100</p>\n", a.security.score));
+    html.push_str(&format!(
+        "<p class=\"score\">Score: {}/100</p>\n",
+        a.security.score
+    ));
     if !a.security.issues.is_empty() {
         html.push_str("<table><tr><th>Severity</th><th>Issue</th><th>Recommendation</th></tr>\n");
         for issue in &a.security.issues {
-            html.push_str(&format!("<tr><td class=\"{}\">{}</td><td>{}</td><td>{}</td></tr>\n",
-                issue.severity, issue.severity, issue.title, issue.recommendation));
+            html.push_str(&format!(
+                "<tr><td class=\"{}\">{}</td><td>{}</td><td>{}</td></tr>\n",
+                html_class(&issue.severity),
+                html_escape(&issue.severity),
+                html_escape(&issue.title),
+                html_escape(&issue.recommendation)
+            ));
         }
         html.push_str("</table>\n");
     }
@@ -232,43 +346,224 @@ fn generate_csv(a: &ApkAnalysis) -> String {
 
     // Overview section
     csv.push_str("Section,Field,Value\n");
-    csv.push_str(&format!("Overview,App Name,{}\n", a.overview.app_name));
-    csv.push_str(&format!("Overview,Package,{}\n", a.overview.package_name));
-    csv.push_str(&format!("Overview,Version,{}\n", a.overview.version_name));
-    csv.push_str(&format!("Overview,Version Code,{}\n", a.overview.version_code));
-    csv.push_str(&format!("Overview,Min SDK,{}\n", a.overview.min_sdk));
-    csv.push_str(&format!("Overview,Target SDK,{}\n", a.overview.target_sdk));
-    csv.push_str(&format!("Overview,APK Size,{}\n", a.file_size));
-    csv.push_str(&format!("Overview,ABIs,{}\n", a.overview.abis.join("; ")));
-    csv.push_str(&format!("Overview,Debuggable,{}\n", a.overview.debuggable));
+    push_csv_row(&mut csv, &["Overview", "App Name", &a.overview.app_name]);
+    push_csv_row(&mut csv, &["Overview", "Package", &a.overview.package_name]);
+    push_csv_row(&mut csv, &["Overview", "Version", &a.overview.version_name]);
+    push_csv_row(
+        &mut csv,
+        &["Overview", "Version Code", &a.overview.version_code],
+    );
+    push_csv_row(&mut csv, &["Overview", "Min SDK", &a.overview.min_sdk]);
+    push_csv_row(
+        &mut csv,
+        &["Overview", "Target SDK", &a.overview.target_sdk],
+    );
+    push_csv_row(
+        &mut csv,
+        &["Overview", "APK Size", &a.file_size.to_string()],
+    );
+    push_csv_row(&mut csv, &["Overview", "ABIs", &a.overview.abis.join("; ")]);
+    push_csv_row(
+        &mut csv,
+        &["Overview", "Debuggable", &a.overview.debuggable.to_string()],
+    );
     csv.push_str("\n");
 
     // Permissions
     csv.push_str("\nPermission,Protection Level,Risk Level,Category\n");
     for p in &a.permissions.permissions {
-        csv.push_str(&format!("{},{},{},{}\n", p.name, p.protection_level, p.risk_level, p.category));
+        push_csv_row(
+            &mut csv,
+            &[&p.name, &p.protection_level, &p.risk_level, &p.category],
+        );
     }
 
     // Components
     csv.push_str("\nComponent,Name,Exported,Permission\n");
     for c in &a.manifest.activities {
-        csv.push_str(&format!("Activity,{},{},{}\n", c.name, c.exported, c.permission.as_deref().unwrap_or("")));
+        push_csv_row(
+            &mut csv,
+            &[
+                "Activity",
+                &c.name,
+                &c.exported.to_string(),
+                c.permission.as_deref().unwrap_or(""),
+            ],
+        );
     }
     for c in &a.manifest.services {
-        csv.push_str(&format!("Service,{},{},{}\n", c.name, c.exported, c.permission.as_deref().unwrap_or("")));
+        push_csv_row(
+            &mut csv,
+            &[
+                "Service",
+                &c.name,
+                &c.exported.to_string(),
+                c.permission.as_deref().unwrap_or(""),
+            ],
+        );
     }
     for c in &a.manifest.receivers {
-        csv.push_str(&format!("Receiver,{},{},{}\n", c.name, c.exported, c.permission.as_deref().unwrap_or("")));
+        push_csv_row(
+            &mut csv,
+            &[
+                "Receiver",
+                &c.name,
+                &c.exported.to_string(),
+                c.permission.as_deref().unwrap_or(""),
+            ],
+        );
     }
     for c in &a.manifest.providers {
-        csv.push_str(&format!("Provider,{},{},{}\n", c.name, c.exported, c.permission.as_deref().unwrap_or("")));
+        push_csv_row(
+            &mut csv,
+            &[
+                "Provider",
+                &c.name,
+                &c.exported.to_string(),
+                c.permission.as_deref().unwrap_or(""),
+            ],
+        );
     }
 
     // Security
     csv.push_str("\nSecurity Issue,Severity,Category,Recommendation\n");
     for issue in &a.security.issues {
-        csv.push_str(&format!("{},{},{},{}\n", issue.title, issue.severity, issue.category, issue.recommendation));
+        push_csv_row(
+            &mut csv,
+            &[
+                &issue.title,
+                &issue.severity,
+                &issue.category,
+                &issue.recommendation,
+            ],
+        );
     }
 
     csv
+}
+
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn html_class(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '_')
+        .collect()
+}
+
+fn push_csv_row(out: &mut String, fields: &[&str]) {
+    for (index, field) in fields.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(&csv_cell(field));
+    }
+    out.push('\n');
+}
+
+fn csv_cell(value: &str) -> String {
+    let safe = if value.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{}", value)
+    } else {
+        value.to_string()
+    };
+    format!("\"{}\"", safe.replace('"', "\"\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        ai_summary::AISummary,
+        analysis::ApkAnalysis,
+        certificate::CertificateAnalysis,
+        components::ComponentAnalysis,
+        dex::DexAnalysis,
+        manifest::{Component, ManifestInfo},
+        native_libs::NativeLibAnalysis,
+        overview::OverviewInfo,
+        permissions::{PermissionAnalysis, PermissionInfo, PermissionSummary},
+        resources::ResourceAnalysis,
+        security::{SecurityAnalysis, SecurityIssue},
+    };
+
+    fn analysis_fixture() -> ApkAnalysis {
+        ApkAnalysis {
+            file_path: "C:/tmp/app.apk".to_string(),
+            file_name: "evil<apk>.apk".to_string(),
+            file_size: 123,
+            analyzed_at: "2026-07-07T00:00:00Z".to_string(),
+            overview: OverviewInfo {
+                app_name: "<script>alert(1)</script>".to_string(),
+                package_name: "=cmd|' /C calc'!A0".to_string(),
+                version_name: "1,2\"3".to_string(),
+                abis: vec!["arm64-v8a".to_string()],
+                ..Default::default()
+            },
+            manifest: ManifestInfo {
+                activities: vec![Component {
+                    name: "+Launch".to_string(),
+                    exported: true,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            permissions: PermissionAnalysis {
+                permissions: vec![PermissionInfo {
+                    name: "android.permission.CAMERA".to_string(),
+                    protection_level: "dangerous".to_string(),
+                    risk_level: "high".to_string(),
+                    category: "camera".to_string(),
+                    ..Default::default()
+                }],
+                summary: PermissionSummary {
+                    total: 1,
+                    dangerous: 1,
+                    ..Default::default()
+                },
+            },
+            components: ComponentAnalysis::default(),
+            resources: ResourceAnalysis::default(),
+            native_libs: NativeLibAnalysis::default(),
+            dex: DexAnalysis::default(),
+            certificate: CertificateAnalysis::default(),
+            security: SecurityAnalysis {
+                score: 100,
+                issues: vec![SecurityIssue {
+                    severity: "high\" onclick=\"x".to_string(),
+                    title: "<b>bad</b>".to_string(),
+                    recommendation: "Use > safe < text".to_string(),
+                    ..Default::default()
+                }],
+                recommendations: Vec::new(),
+            },
+            ai_summary: Some(AISummary::default()),
+            plugins: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn generate_html_escapes_user_controlled_fields() {
+        let html = generate_html(&analysis_fixture());
+
+        assert!(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assert!(html.contains("evil&lt;apk&gt;.apk"));
+        assert!(!html.contains("<script>alert(1)</script>"));
+    }
+
+    #[test]
+    fn generate_csv_quotes_cells_and_prefixes_formula_values() {
+        let csv = generate_csv(&analysis_fixture());
+
+        assert!(csv.contains("\"'=cmd|' /C calc'!A0\""));
+        assert!(csv.contains("\"1,2\"\"3\""));
+        assert!(csv.contains("\"'+Launch\""));
+    }
 }

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-use std::io::{Cursor, Read};
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Cursor, Read};
 
 /// Parse resources.arsc to extract string pool and package info
 pub struct ArscParser;

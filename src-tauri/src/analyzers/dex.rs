@@ -1,6 +1,6 @@
-use crate::parser::ApkReader;
-use crate::parser::dex::DexParser;
 use crate::models::dex::*;
+use crate::parser::dex::DexParser;
+use crate::parser::ApkReader;
 use std::collections::HashMap;
 
 pub struct DexAnalyzer;
@@ -14,7 +14,8 @@ impl super::Analyzer for DexAnalyzer {
 
     fn analyze(&self, apk: &mut ApkReader) -> Result<Self::Output, String> {
         let file_names = apk.file_names();
-        let dex_names: Vec<String> = file_names.into_iter()
+        let dex_names: Vec<String> = file_names
+            .into_iter()
             .filter(|f| f.starts_with("classes") && f.ends_with(".dex"))
             .collect();
 
@@ -64,15 +65,14 @@ impl super::Analyzer for DexAnalyzer {
         let mut packages: Vec<PackageInfo> = all_packages.into_values().collect();
         packages.sort_by(|a, b| b.class_count.cmp(&a.class_count));
 
-        let largest_packages: Vec<PackageInfo> = packages.iter()
-            .take(20)
-            .cloned()
-            .collect();
+        let largest_packages: Vec<PackageInfo> = packages.iter().take(20).cloned().collect();
+
+        let total_dex_files = dex_files.len();
 
         Ok(DexAnalysis {
             dex_files,
             summary: DexSummary {
-                total_dex_files: dex_names.len(),
+                total_dex_files,
                 total_classes,
                 total_methods,
                 total_fields,
@@ -82,5 +82,52 @@ impl super::Analyzer for DexAnalyzer {
             largest_packages,
             largest_classes: Vec::new(), // Would need deeper DEX parsing
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzers::Analyzer;
+    use crate::parser::ApkReader;
+    use std::fs::File;
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
+
+    fn minimal_dex() -> Vec<u8> {
+        let mut data = vec![0u8; 112];
+        data[0..8].copy_from_slice(b"dex\n035\0");
+        data[32..36].copy_from_slice(&(112u32).to_le_bytes());
+        data[36..40].copy_from_slice(&(112u32).to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn analyze_counts_only_dex_files_that_parse_successfully() {
+        let path =
+            std::env::temp_dir().join(format!("apk-analyzer-dex-test-{}.apk", std::process::id()));
+        let file = File::create(&path).expect("test APK should be created");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+        zip.start_file("classes.dex", options)
+            .expect("valid dex entry should start");
+        zip.write_all(&minimal_dex())
+            .expect("valid dex entry should write");
+        zip.start_file("classes2.dex", options)
+            .expect("invalid dex entry should start");
+        zip.write_all(b"not a dex")
+            .expect("invalid dex entry should write");
+        zip.finish().expect("test APK should finish");
+
+        let mut apk = ApkReader::open(&path.to_string_lossy()).expect("test APK should open");
+
+        let analysis = DexAnalyzer
+            .analyze(&mut apk)
+            .expect("valid dex entry should analyze");
+
+        assert_eq!(analysis.summary.total_dex_files, 1);
+        assert_eq!(analysis.dex_files.len(), 1);
+
+        std::fs::remove_file(path).expect("test APK should be removed");
     }
 }

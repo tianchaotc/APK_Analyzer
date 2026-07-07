@@ -1,6 +1,5 @@
-use crate::parser::ApkReader;
 use crate::models::security::*;
-use crate::models::manifest::ManifestInfo;
+use crate::parser::ApkReader;
 
 pub struct SecurityAnalyzer;
 
@@ -21,7 +20,8 @@ impl super::Analyzer for SecurityAnalyzer {
 
         // Check debuggable
         if let Some(app) = element.find("application") {
-            let debuggable = app.get_attr("android:debuggable")
+            let debuggable = app
+                .get_attr("android:debuggable")
                 .or_else(|| app.get_attr("debuggable"))
                 .map(|v| v == "true")
                 .unwrap_or(false);
@@ -33,11 +33,12 @@ impl super::Analyzer for SecurityAnalyzer {
                     description: "android:debuggable=true allows arbitrary code attachment and debugging. This should never be enabled in production.".to_string(),
                     recommendation: "Set android:debuggable=\"false\" in the manifest.".to_string(),
                 });
-                score -= 25;
+                apply_penalty(&mut score, 25);
             }
 
             // Check allowBackup
-            let allow_backup = app.get_attr("android:allowBackup")
+            let allow_backup = app
+                .get_attr("android:allowBackup")
                 .or_else(|| app.get_attr("allowBackup"))
                 .map(|v| v != "false")
                 .unwrap_or(true);
@@ -49,11 +50,12 @@ impl super::Analyzer for SecurityAnalyzer {
                     description: "android:allowBackup=true allows app data to be backed up and restored via adb, potentially exposing sensitive data.".to_string(),
                     recommendation: "Set android:allowBackup=\"false\" if the app handles sensitive data.".to_string(),
                 });
-                score -= 10;
+                apply_penalty(&mut score, 10);
             }
 
             // Check cleartext traffic
-            let cleartext = app.get_attr("android:usesCleartextTraffic")
+            let cleartext = app
+                .get_attr("android:usesCleartextTraffic")
                 .or_else(|| app.get_attr("usesCleartextTraffic"))
                 .map(|v| v == "true")
                 .unwrap_or(false);
@@ -65,19 +67,20 @@ impl super::Analyzer for SecurityAnalyzer {
                     description: "android:usesCleartextTraffic=true allows HTTP (unencrypted) traffic, vulnerable to man-in-the-middle attacks.".to_string(),
                     recommendation: "Set android:usesCleartextTraffic=\"false\" and use HTTPS for all network communication.".to_string(),
                 });
-                score -= 15;
+                apply_penalty(&mut score, 15);
             }
 
             // Check exported components without permission
             for activity in app.find_all("activity") {
-                let exported = activity.get_attr("android:exported")
-                    .or_else(|| activity.get_attr("exported"))
-                    .map(|v| v == "true")
-                    .unwrap_or(false);
-                let permission = activity.get_attr("android:permission")
+                let exported = super::manifest::infer_exported(
+                    activity,
+                    super::manifest::ComponentKind::Activity,
+                );
+                let permission = activity
+                    .get_attr("android:permission")
                     .or_else(|| activity.get_attr("permission"));
-                let has_intent_filter = activity.find("intent-filter").is_some();
-                let name = activity.get_attr("android:name")
+                let name = activity
+                    .get_attr("android:name")
                     .or_else(|| activity.get_attr("name"))
                     .unwrap_or_default();
 
@@ -89,18 +92,20 @@ impl super::Analyzer for SecurityAnalyzer {
                         description: "This activity is exported but has no permission protection, allowing any app to launch it.".to_string(),
                         recommendation: "Set android:exported=\"false\" or add a custom permission.".to_string(),
                     });
-                    score -= 5;
+                    apply_penalty(&mut score, 5);
                 }
             }
 
             for service in app.find_all("service") {
-                let exported = service.get_attr("android:exported")
-                    .or_else(|| service.get_attr("exported"))
-                    .map(|v| v == "true")
-                    .unwrap_or(false);
-                let permission = service.get_attr("android:permission")
+                let exported = super::manifest::infer_exported(
+                    service,
+                    super::manifest::ComponentKind::Service,
+                );
+                let permission = service
+                    .get_attr("android:permission")
                     .or_else(|| service.get_attr("permission"));
-                let name = service.get_attr("android:name")
+                let name = service
+                    .get_attr("android:name")
                     .or_else(|| service.get_attr("name"))
                     .unwrap_or_default();
 
@@ -112,18 +117,20 @@ impl super::Analyzer for SecurityAnalyzer {
                         description: "This service is exported but has no permission protection.".to_string(),
                         recommendation: "Set android:exported=\"false\" or add a custom permission.".to_string(),
                     });
-                    score -= 5;
+                    apply_penalty(&mut score, 5);
                 }
             }
 
             for receiver in app.find_all("receiver") {
-                let exported = receiver.get_attr("android:exported")
-                    .or_else(|| receiver.get_attr("exported"))
-                    .map(|v| v == "true")
-                    .unwrap_or(false);
-                let permission = receiver.get_attr("android:permission")
+                let exported = super::manifest::infer_exported(
+                    receiver,
+                    super::manifest::ComponentKind::Receiver,
+                );
+                let permission = receiver
+                    .get_attr("android:permission")
                     .or_else(|| receiver.get_attr("permission"));
-                let name = receiver.get_attr("android:name")
+                let name = receiver
+                    .get_attr("android:name")
                     .or_else(|| receiver.get_attr("name"))
                     .unwrap_or_default();
 
@@ -135,18 +142,20 @@ impl super::Analyzer for SecurityAnalyzer {
                         description: "This broadcast receiver is exported but has no permission protection.".to_string(),
                         recommendation: "Set android:exported=\"false\" or add a custom permission.".to_string(),
                     });
-                    score -= 5;
+                    apply_penalty(&mut score, 5);
                 }
             }
 
             for provider in app.find_all("provider") {
-                let exported = provider.get_attr("android:exported")
-                    .or_else(|| provider.get_attr("exported"))
-                    .map(|v| v == "true")
-                    .unwrap_or(false);
-                let permission = provider.get_attr("android:permission")
+                let exported = super::manifest::infer_exported(
+                    provider,
+                    super::manifest::ComponentKind::Provider,
+                );
+                let permission = provider
+                    .get_attr("android:permission")
                     .or_else(|| provider.get_attr("permission"));
-                let name = provider.get_attr("android:name")
+                let name = provider
+                    .get_attr("android:name")
                     .or_else(|| provider.get_attr("name"))
                     .unwrap_or_default();
 
@@ -158,14 +167,15 @@ impl super::Analyzer for SecurityAnalyzer {
                         description: "This content provider is exported without permission protection. Any app can read/write its data.".to_string(),
                         recommendation: "Set android:exported=\"false\" or add strict read/write permissions.".to_string(),
                     });
-                    score -= 15;
+                    apply_penalty(&mut score, 15);
                 }
             }
         }
 
         // Check target SDK
         for child in element.find_all("uses-sdk") {
-            if let Some(target) = child.get_attr("android:targetSdk")
+            if let Some(target) = child
+                .get_attr("android:targetSdk")
                 .or_else(|| child.get_attr("targetSdk"))
                 .and_then(|v| v.parse::<u32>().ok())
             {
@@ -177,7 +187,7 @@ impl super::Analyzer for SecurityAnalyzer {
                         description: format!("Targeting SDK {} misses security improvements in newer Android versions.", target),
                         recommendation: "Update targetSdkVersion to at least 33 (Android 13) to receive latest security enhancements.".to_string(),
                     });
-                    score -= 5;
+                    apply_penalty(&mut score, 5);
                 }
             }
         }
@@ -203,14 +213,21 @@ impl super::Analyzer for SecurityAnalyzer {
         ];
 
         for perm_elem in element.find_all("uses-permission") {
-            if let Some(name) = perm_elem.get_attr("android:name").or_else(|| perm_elem.get_attr("name")) {
+            if let Some(name) = perm_elem
+                .get_attr("android:name")
+                .or_else(|| perm_elem.get_attr("name"))
+            {
                 if high_risk_perms.contains(&name.as_str()) {
                     issues.push(SecurityIssue {
                         severity: "info".to_string(),
                         category: "Permission".to_string(),
                         title: format!("High-risk permission: {}", name),
-                        description: "This permission is classified as dangerous and requires user consent.".to_string(),
-                        recommendation: "Ensure this permission is necessary and handle the data responsibly.".to_string(),
+                        description:
+                            "This permission is classified as dangerous and requires user consent."
+                                .to_string(),
+                        recommendation:
+                            "Ensure this permission is necessary and handle the data responsibly."
+                                .to_string(),
                     });
                 }
             }
@@ -219,7 +236,12 @@ impl super::Analyzer for SecurityAnalyzer {
         // Build recommendations
         for issue in &issues {
             if issue.severity == "critical" || issue.severity == "high" {
-                recommendations.push(format!("[{}] {} - {}", issue.severity.to_uppercase(), issue.title, issue.recommendation));
+                recommendations.push(format!(
+                    "[{}] {} - {}",
+                    issue.severity.to_uppercase(),
+                    issue.title,
+                    issue.recommendation
+                ));
             }
         }
 
@@ -231,5 +253,23 @@ impl super::Analyzer for SecurityAnalyzer {
             issues,
             recommendations,
         })
+    }
+}
+
+fn apply_penalty(score: &mut u32, penalty: u32) {
+    *score = score.saturating_sub(penalty);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_penalty_clamps_score_at_zero() {
+        let mut score = 3;
+
+        apply_penalty(&mut score, 5);
+
+        assert_eq!(score, 0);
     }
 }
