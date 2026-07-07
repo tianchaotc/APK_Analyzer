@@ -1,8 +1,8 @@
-use crate::parser::ApkReader;
-use crate::parser::signing;
 use crate::models::certificate::*;
-use std::fs;
+use crate::parser::signing;
+use crate::parser::ApkReader;
 use std::collections::HashSet;
+use std::fs;
 
 pub struct CertificateAnalyzer;
 
@@ -14,8 +14,8 @@ impl super::Analyzer for CertificateAnalyzer {
     }
 
     fn analyze(&self, apk: &mut ApkReader) -> Result<Self::Output, String> {
-        let raw_apk = fs::read(&apk.file_path)
-            .map_err(|e| format!("Failed to read raw APK: {}", e))?;
+        let raw_apk =
+            fs::read(&apk.file_path).map_err(|e| format!("Failed to read raw APK: {}", e))?;
 
         let v2_certs = signing::parse_signing_block(&raw_apk).unwrap_or_default();
         let (has_v2, has_v3) = check_signature_schemes(&raw_apk);
@@ -27,7 +27,11 @@ impl super::Analyzer for CertificateAnalyzer {
         let mut is_debug = false;
         let mut is_expired = false;
 
-        let all_certs = if !v2_certs.is_empty() { v2_certs } else { v1_certs };
+        let all_certs = if !v2_certs.is_empty() {
+            v2_certs
+        } else {
+            v1_certs
+        };
 
         for cert in &all_certs {
             let signer = SignerInfo {

@@ -1,6 +1,6 @@
-use crate::parser::ApkReader;
 use crate::models::components::*;
 use crate::models::manifest::ManifestInfo;
+use crate::parser::ApkReader;
 
 pub struct ComponentAnalyzer;
 
@@ -87,8 +87,24 @@ fn count_exported(manifest: &ManifestInfo) -> usize {
 }
 
 fn count_with_intent_filters(manifest: &ManifestInfo) -> usize {
-    manifest.activities.iter().filter(|c| !c.intent_filters.is_empty()).count()
-        + manifest.services.iter().filter(|c| !c.intent_filters.is_empty()).count()
-        + manifest.receivers.iter().filter(|c| !c.intent_filters.is_empty()).count()
-        + manifest.providers.iter().filter(|c| !c.intent_filters.is_empty()).count()
+    manifest
+        .activities
+        .iter()
+        .filter(|c| !c.intent_filters.is_empty())
+        .count()
+        + manifest
+            .services
+            .iter()
+            .filter(|c| !c.intent_filters.is_empty())
+            .count()
+        + manifest
+            .receivers
+            .iter()
+            .filter(|c| !c.intent_filters.is_empty())
+            .count()
+        + manifest
+            .providers
+            .iter()
+            .filter(|c| !c.intent_filters.is_empty())
+            .count()
 }

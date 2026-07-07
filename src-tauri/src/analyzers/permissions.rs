@@ -1,5 +1,5 @@
-use crate::parser::ApkReader;
 use crate::models::permissions::*;
+use crate::parser::ApkReader;
 use crate::utils::permission_db;
 
 pub struct PermissionAnalyzer;
@@ -19,7 +19,8 @@ impl super::Analyzer for PermissionAnalyzer {
         let mut summary = PermissionSummary::default();
 
         for perm_elem in element.find_all("uses-permission") {
-            let name = perm_elem.get_attr("android:name")
+            let name = perm_elem
+                .get_attr("android:name")
                 .or_else(|| perm_elem.get_attr("name"))
                 .unwrap_or_default();
             if name.is_empty() {
@@ -61,6 +62,9 @@ impl super::Analyzer for PermissionAnalyzer {
             order(&a.protection_level).cmp(&order(&b.protection_level))
         });
 
-        Ok(PermissionAnalysis { permissions, summary })
+        Ok(PermissionAnalysis {
+            permissions,
+            summary,
+        })
     }
 }

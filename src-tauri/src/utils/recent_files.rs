@@ -37,12 +37,15 @@ pub fn add(file_path: &str, file_name: &str, file_size: u64) -> Vec<RecentFile> 
     recent.retain(|r| r.path != file_path);
 
     // Add new entry at the top
-    recent.insert(0, RecentFile {
-        path: file_path.to_string(),
-        name: file_name.to_string(),
-        size: file_size,
-        last_opened: chrono::Utc::now().to_rfc3339(),
-    });
+    recent.insert(
+        0,
+        RecentFile {
+            path: file_path.to_string(),
+            name: file_name.to_string(),
+            size: file_size,
+            last_opened: chrono::Utc::now().to_rfc3339(),
+        },
+    );
 
     // Keep only last 20 entries
     recent.truncate(20);

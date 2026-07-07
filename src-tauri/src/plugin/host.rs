@@ -3,9 +3,9 @@ use std::ptr;
 
 use log::{error, info, trace, warn};
 
-use crate::parser::ApkReader;
 use crate::parser::axml;
 use crate::parser::dex::DexParser;
+use crate::parser::ApkReader;
 
 use super::abi::{self, HostApi, ERR_GENERIC, ERR_INVALID_ARG, ERR_NOT_FOUND, OK};
 
@@ -316,14 +316,17 @@ fn axml_element_to_json_value(elem: &axml::AxmlElement) -> serde_json::Value {
 /// 将 DexStats 序列化为 JSON。
 /// DexStats 没有派生 Serialize，这里手动构造，避免修改 parser/dex.rs。
 fn dex_stats_to_json(stats: &crate::parser::dex::DexStats) -> String {
-    let packages: Vec<serde_json::Value> = stats.packages
+    let packages: Vec<serde_json::Value> = stats
+        .packages
         .iter()
-        .map(|(name, pkg)| serde_json::json!({
-            "name": name,
-            "class_count": pkg.class_count,
-            "method_count": pkg.method_count,
-            "field_count": pkg.field_count,
-        }))
+        .map(|(name, pkg)| {
+            serde_json::json!({
+                "name": name,
+                "class_count": pkg.class_count,
+                "method_count": pkg.method_count,
+                "field_count": pkg.field_count,
+            })
+        })
         .collect();
     serde_json::json!({
         "file_size": stats.file_size,
@@ -335,5 +338,6 @@ fn dex_stats_to_json(stats: &crate::parser::dex::DexStats) -> String {
         "proto_count": stats.proto_count,
         "class_names": stats.class_names,
         "packages": packages,
-    }).to_string()
+    })
+    .to_string()
 }

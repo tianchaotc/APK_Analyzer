@@ -1,13 +1,13 @@
+pub mod ai_summary;
+pub mod certificate;
+pub mod components;
+pub mod dex;
 pub mod manifest;
+pub mod native_libs;
 pub mod overview;
 pub mod permissions;
-pub mod components;
 pub mod resources;
-pub mod native_libs;
-pub mod dex;
-pub mod certificate;
 pub mod security;
-pub mod ai_summary;
 
 use crate::parser::ApkReader;
 

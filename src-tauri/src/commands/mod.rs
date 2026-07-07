@@ -1,13 +1,13 @@
-use tauri::{Emitter, State};
+use crate::analyzers::ai_summary as ai_analyzer;
+use crate::analyzers::*;
+use crate::export;
 use crate::models::analysis::*;
 use crate::parser::ApkReader;
-use crate::analyzers::*;
-use crate::analyzers::ai_summary as ai_analyzer;
-use crate::export;
 use crate::utils::recent_files;
+use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use once_cell::sync::Lazy;
+use tauri::{Emitter, State};
 
 static CANCEL_FLAG: Lazy<Arc<AtomicBool>> = Lazy::new(|| Arc::new(AtomicBool::new(false)));
 
@@ -20,8 +20,7 @@ pub fn open_apk(path: String) -> Result<ApkFileInfo, String> {
         .unwrap_or("unknown.apk")
         .to_string();
 
-    let metadata = std::fs::metadata(&path)
-        .map_err(|e| format!("Cannot access file: {}", e))?;
+    let metadata = std::fs::metadata(&path).map_err(|e| format!("Cannot access file: {}", e))?;
 
     if !path.to_lowercase().ends_with(".apk") {
         return Err("File must be an APK".to_string());
@@ -70,7 +69,9 @@ pub async fn analyze_apk(
     let mut plugin_results = Vec::new();
 
     let _ = emit_progress(&window, "Overview", "Analyzing app overview...", 10);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let overview = overview::OverviewAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "overview", &overview);
     plugin_results.extend(run_plugins_for_stage(
@@ -82,7 +83,9 @@ pub async fn analyze_apk(
     )?);
 
     let _ = emit_progress(&window, "Manifest", "Parsing AndroidManifest.xml...", 20);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let manifest = manifest::ManifestAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "manifest", &manifest);
     plugin_results.extend(run_plugins_for_stage(
@@ -94,37 +97,56 @@ pub async fn analyze_apk(
     )?);
 
     let _ = emit_progress(&window, "Permissions", "Analyzing permissions...", 30);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let permissions = permissions::PermissionAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "permissions", &permissions);
 
     let _ = emit_progress(&window, "Components", "Analyzing components...", 40);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let components = components::ComponentAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "components", &components);
 
     let _ = emit_progress(&window, "Resources", "Analyzing resources...", 55);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let resources = resources::ResourceAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "resources", &resources);
 
-    let _ = emit_progress(&window, "Native Libraries", "Analyzing native libraries...", 65);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    let _ = emit_progress(
+        &window,
+        "Native Libraries",
+        "Analyzing native libraries...",
+        65,
+    );
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let native_libs = native_libs::NativeLibAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "native_libs", &native_libs);
 
     let _ = emit_progress(&window, "DEX", "Analyzing DEX files...", 75);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let dex = dex::DexAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "dex", &dex);
 
     let _ = emit_progress(&window, "Certificate", "Analyzing certificates...", 85);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let certificate = certificate::CertificateAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "certificate", &certificate);
 
     let _ = emit_progress(&window, "Security", "Running security checks...", 95);
-    if CANCEL_FLAG.load(Ordering::SeqCst) { return Err("Analysis cancelled".to_string()); }
+    if CANCEL_FLAG.load(Ordering::SeqCst) {
+        return Err("Analysis cancelled".to_string());
+    }
     let security = security::SecurityAnalyzer.analyze(&mut apk)?;
     insert_analysis_json(&mut analysis_json, "security", &security);
     plugin_results.extend(run_plugins_for_stage(
@@ -203,7 +225,11 @@ pub fn search_global(
             results.push(SearchResult {
                 category: "Manifest > Activities".to_string(),
                 title: activity.name.clone(),
-                detail: format!("Exported: {}, Intent filters: {}", activity.exported, activity.intent_filters.len()),
+                detail: format!(
+                    "Exported: {}, Intent filters: {}",
+                    activity.exported,
+                    activity.intent_filters.len()
+                ),
             });
         }
     }
@@ -243,7 +269,10 @@ pub fn search_global(
             results.push(SearchResult {
                 category: "Permissions".to_string(),
                 title: perm.name.clone(),
-                detail: format!("Level: {}, Risk: {}", perm.protection_level, perm.risk_level),
+                detail: format!(
+                    "Level: {}, Risk: {}",
+                    perm.protection_level, perm.risk_level
+                ),
             });
         }
     }
@@ -267,7 +296,10 @@ pub fn search_global(
             results.push(SearchResult {
                 category: "DEX > Packages".to_string(),
                 title: pkg.name.clone(),
-                detail: format!("Classes: {}, Methods: {}", pkg.class_count, pkg.method_count),
+                detail: format!(
+                    "Classes: {}, Methods: {}",
+                    pkg.class_count, pkg.method_count
+                ),
             });
         }
     }
@@ -351,12 +383,22 @@ pub fn cancel_analysis() {
     CANCEL_FLAG.store(true, Ordering::SeqCst);
 }
 
-fn emit_progress(window: &tauri::WebviewWindow, stage: &str, message: &str, percent: u8) -> Result<(), String> {
-    window.emit("analysis-progress", ProgressUpdate {
-        stage: stage.to_string(),
-        message: message.to_string(),
-        percent,
-    }).map_err(|e| format!("Failed to emit progress: {}", e))
+fn emit_progress(
+    window: &tauri::WebviewWindow,
+    stage: &str,
+    message: &str,
+    percent: u8,
+) -> Result<(), String> {
+    window
+        .emit(
+            "analysis-progress",
+            ProgressUpdate {
+                stage: stage.to_string(),
+                message: message.to_string(),
+                percent,
+            },
+        )
+        .map_err(|e| format!("Failed to emit progress: {}", e))
 }
 
 // ============ 插件集成 ============
@@ -495,9 +537,7 @@ fn run_plugins_for_stage(
                 let data = if out.is_null() || out_len == 0 {
                     serde_json::Value::Null
                 } else {
-                    let bytes = unsafe {
-                        std::slice::from_raw_parts(out as *const u8, out_len)
-                    };
+                    let bytes = unsafe { std::slice::from_raw_parts(out as *const u8, out_len) };
                     match serde_json::from_slice(bytes) {
                         Ok(v) => v,
                         Err(e) => serde_json::json!({ "_error": format!("invalid JSON: {}", e) }),
@@ -592,7 +632,9 @@ pub fn set_plugin_enabled(plugin_id: String, enabled: bool) -> Result<(), String
 /// 获取插件目录路径（用于 UI "打开插件目录" 按钮）
 #[tauri::command]
 pub fn get_plugins_dir() -> String {
-    crate::plugin::manager::plugins_dir().to_string_lossy().to_string()
+    crate::plugin::manager::plugins_dir()
+        .to_string_lossy()
+        .to_string()
 }
 
 /// 执行插件命令
@@ -605,9 +647,9 @@ pub fn plugin_command(
     use std::ffi::CString;
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    let vtable_ptr = crate::plugin::manager::with_manager(|m| {
-        m.get(&plugin_id).map(|p| p.vtable.as_ptr())
-    }).ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
+    let vtable_ptr =
+        crate::plugin::manager::with_manager(|m| m.get(&plugin_id).map(|p| p.vtable.as_ptr()))
+            .ok_or_else(|| format!("Plugin not found: {}", plugin_id))?;
 
     if vtable_ptr.is_null() {
         return Err(format!("Plugin '{}' not properly loaded", plugin_id));
@@ -615,7 +657,9 @@ pub fn plugin_command(
 
     // SAFETY: 同 run_plugins
     let vtable: &crate::plugin::PluginVTable = unsafe { &*vtable_ptr };
-    let command_fn = vtable.command.ok_or_else(|| format!("Plugin '{}' has no command capability", plugin_id))?;
+    let command_fn = vtable
+        .command
+        .ok_or_else(|| format!("Plugin '{}' has no command capability", plugin_id))?;
 
     // 命令通常不需要 APK 访问，但 HostApi 仍需构造（约定）
     // 这里用空 analysis_json，apk 不提供

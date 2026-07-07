@@ -1,13 +1,13 @@
-pub mod commands;
 pub mod analyzers;
-pub mod parser;
-pub mod models;
+pub mod commands;
 pub mod export;
-pub mod utils;
+pub mod models;
+pub mod parser;
 pub mod plugin;
+pub mod utils;
 
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 
 /// Global state: holds the current analysis result
 pub struct AppState {

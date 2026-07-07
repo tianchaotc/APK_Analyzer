@@ -115,7 +115,10 @@ impl PluginManager {
     /// 扫描插件目录，加载每个子目录中的动态库 + manifest.json
     fn scan(&mut self, plugins_dir: &Path) {
         if !plugins_dir.exists() {
-            info!("Plugin directory does not exist, creating: {:?}", plugins_dir);
+            info!(
+                "Plugin directory does not exist, creating: {:?}",
+                plugins_dir
+            );
             let _ = std::fs::create_dir_all(plugins_dir);
             return;
         }
@@ -171,22 +174,17 @@ impl PluginManager {
         if manifest.id.is_empty() {
             let err = "manifest.json missing 'id'".to_string();
             warn!("Plugin {:?}: {}", dir, err);
-            self.plugins.push(LoadedPlugin::failed(
-                lib_path,
-                manifest,
-                err,
-            ));
+            self.plugins
+                .push(LoadedPlugin::failed(lib_path, manifest, err));
             return;
         }
 
         // 加载动态库
         if !lib_path.exists() {
-            let err = format!(
-                "Dynamic library not found: {}",
-                lib_path.display()
-            );
+            let err = format!("Dynamic library not found: {}", lib_path.display());
             warn!("Plugin {}: {}", manifest.id, err);
-            self.plugins.push(LoadedPlugin::failed(lib_path, manifest, err));
+            self.plugins
+                .push(LoadedPlugin::failed(lib_path, manifest, err));
             return;
         }
 
@@ -196,7 +194,8 @@ impl PluginManager {
                 Err(e) => {
                     let err = format!("Failed to load library: {}", e);
                     error!("Plugin {}: {}", manifest.id, err);
-                    self.plugins.push(LoadedPlugin::failed(lib_path, manifest, err));
+                    self.plugins
+                        .push(LoadedPlugin::failed(lib_path, manifest, err));
                     return;
                 }
             }
@@ -211,7 +210,8 @@ impl PluginManager {
                 Err(e) => {
                     let err = format!("Missing symbol '{}': {}", ENTRY_SYMBOL, e);
                     error!("Plugin {}: {}", manifest.id, err);
-                    self.plugins.push(LoadedPlugin::failed(lib_path, manifest, err));
+                    self.plugins
+                        .push(LoadedPlugin::failed(lib_path, manifest, err));
                     return;
                 }
             }
@@ -220,7 +220,8 @@ impl PluginManager {
         if vtable_ptr.is_null() {
             let err = "vtable pointer is null".to_string();
             error!("Plugin {}: {}", manifest.id, err);
-            self.plugins.push(LoadedPlugin::failed(lib_path, manifest, err));
+            self.plugins
+                .push(LoadedPlugin::failed(lib_path, manifest, err));
             return;
         }
 
@@ -235,18 +236,20 @@ impl PluginManager {
                 vtable.abi_version, ABI_VERSION
             );
             error!("Plugin {}: {}", manifest.id, err);
-            self.plugins.push(LoadedPlugin::failed(lib_path, manifest, err));
+            self.plugins
+                .push(LoadedPlugin::failed(lib_path, manifest, err));
             return;
         }
 
-        let enabled = self.enabled_state.get(&manifest.id).copied().unwrap_or(true);
+        let enabled = self
+            .enabled_state
+            .get(&manifest.id)
+            .copied()
+            .unwrap_or(true);
 
         info!(
             "Loaded plugin: {} v{} ({}) — enabled={}",
-            manifest.id,
-            manifest.version,
-            manifest.name,
-            enabled
+            manifest.id, manifest.version, manifest.name, enabled
         );
 
         // 将库句柄转移到 LoadedPlugin，保持 vtable 有效
@@ -287,7 +290,8 @@ impl PluginManager {
         for p in &self.plugins {
             content.push_str(&format!("{} = {}\n", p.manifest.id, p.enabled));
         }
-        if let Err(e) = std::fs::create_dir_all(self.config_path.parent().unwrap_or(Path::new("."))) {
+        if let Err(e) = std::fs::create_dir_all(self.config_path.parent().unwrap_or(Path::new(".")))
+        {
             error!("Failed to create config dir: {}", e);
             return;
         }
@@ -346,7 +350,12 @@ impl PluginManager {
                 description: p.manifest.description.clone(),
                 enabled: p.enabled,
                 load_error: p.load_error.clone(),
-                capabilities: p.manifest.capabilities.iter().map(|c| format!("{:?}", c).to_lowercase()).collect(),
+                capabilities: p
+                    .manifest
+                    .capabilities
+                    .iter()
+                    .map(|c| format!("{:?}", c).to_lowercase())
+                    .collect(),
             })
             .collect()
     }
@@ -401,7 +410,9 @@ where
     F: FnOnce(&PluginManager) -> R,
 {
     let guard = MANAGER.lock().unwrap();
-    f(guard.as_ref().expect("PluginManager not initialized; call init_global() first"))
+    f(guard
+        .as_ref()
+        .expect("PluginManager not initialized; call init_global() first"))
 }
 
 /// 获取全局 PluginManager 的可变访问
@@ -410,5 +421,7 @@ where
     F: FnOnce(&mut PluginManager) -> R,
 {
     let mut guard = MANAGER.lock().unwrap();
-    f(guard.as_mut().expect("PluginManager not initialized; call init_global() first"))
+    f(guard
+        .as_mut()
+        .expect("PluginManager not initialized; call init_global() first"))
 }

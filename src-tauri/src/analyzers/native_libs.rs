@@ -1,5 +1,5 @@
-use crate::parser::ApkReader;
 use crate::models::native_libs::*;
+use crate::parser::ApkReader;
 use std::collections::HashMap;
 
 pub struct NativeLibAnalyzer;
@@ -55,7 +55,8 @@ impl super::Analyzer for NativeLibAnalyzer {
         libraries.sort_by(|a, b| b.size.cmp(&a.size));
 
         // Build ABI groups
-        let mut by_abi: Vec<AbiGroup> = by_abi_map.into_iter()
+        let mut by_abi: Vec<AbiGroup> = by_abi_map
+            .into_iter()
             .map(|(abi, mut libs)| {
                 libs.sort_by(|a, b| b.size.cmp(&a.size));
                 let total_size: u64 = libs.iter().map(|l| l.size).sum();

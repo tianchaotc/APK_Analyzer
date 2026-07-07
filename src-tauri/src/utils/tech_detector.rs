@@ -1,6 +1,6 @@
 use crate::models::ai_summary::*;
-use crate::models::manifest::ManifestInfo;
 use crate::models::dex::DexAnalysis;
+use crate::models::manifest::ManifestInfo;
 
 /// Detect technology stack from file names, manifest, and DEX content
 pub fn detect(
@@ -13,7 +13,9 @@ pub fn detect(
     // === Flutter ===
     let has_flutter = file_names.iter().any(|f| f == "libflutter.so")
         || file_names.iter().any(|f| f.contains("flutter_assets"))
-        || file_names.iter().any(|f| f.starts_with("lib/arm64") && f.contains("libflutter"));
+        || file_names
+            .iter()
+            .any(|f| f.starts_with("lib/arm64") && f.contains("libflutter"));
     if has_flutter {
         results.push(TechStackEntry {
             name: "Flutter".to_string(),
@@ -26,7 +28,9 @@ pub fn detect(
     }
 
     // === React Native ===
-    let has_rn = file_names.iter().any(|f| f == "assets/index.android.bundle")
+    let has_rn = file_names
+        .iter()
+        .any(|f| f == "assets/index.android.bundle")
         || file_names.iter().any(|f| f.contains("react_native"))
         || file_names.iter().any(|f| f == "lib/hermes.so")
         || file_names.iter().any(|f| f.contains("libreactnativejni"));
@@ -44,9 +48,13 @@ pub fn detect(
 
     // === Unity ===
     let has_unity = file_names.iter().any(|f| f.contains("libunity.so"))
-        || file_names.iter().any(|f| f.contains("libmain.so") && f.contains("unity"))
+        || file_names
+            .iter()
+            .any(|f| f.contains("libmain.so") && f.contains("unity"))
         || file_names.iter().any(|f| f.contains("assets/bin/Data"))
-        || file_names.iter().any(|f| f == "assets/bin/Data/Managed/Mono.dll");
+        || file_names
+            .iter()
+            .any(|f| f == "assets/bin/Data/Managed/Mono.dll");
     if has_unity {
         results.push(TechStackEntry {
             name: "Unity".to_string(),
@@ -59,7 +67,9 @@ pub fn detect(
     }
 
     // === Unreal Engine ===
-    let has_unreal = file_names.iter().any(|f| f.contains("libUE4") || f.contains("libUnreal"))
+    let has_unreal = file_names
+        .iter()
+        .any(|f| f.contains("libUE4") || f.contains("libUnreal"))
         || file_names.iter().any(|f| f.contains("UE4Game"));
     if has_unreal {
         results.push(TechStackEntry {
@@ -105,9 +115,10 @@ pub fn detect(
     }
 
     // === Jetpack Compose ===
-    let has_compose = _dex.packages.iter().any(|p| {
-        p.name.contains("androidx.compose") || p.name.contains("androidx.compose.ui")
-    });
+    let has_compose = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("androidx.compose") || p.name.contains("androidx.compose.ui"));
     if has_compose {
         results.push(TechStackEntry {
             name: "Jetpack Compose".to_string(),
@@ -117,7 +128,10 @@ pub fn detect(
     }
 
     // === AndroidX / Jetpack ===
-    let has_androidx = _dex.packages.iter().any(|p| p.name.starts_with("androidx."));
+    let has_androidx = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.starts_with("androidx."));
     if has_androidx {
         results.push(TechStackEntry {
             name: "AndroidX / Jetpack Libraries".to_string(),
@@ -127,12 +141,22 @@ pub fn detect(
     }
 
     // === OkHttp / Retrofit ===
-    let has_okhttp = _dex.packages.iter().any(|p| p.name.contains("okhttp3") || p.name.contains("okhttp"));
-    let has_retrofit = _dex.packages.iter().any(|p| p.name.contains("retrofit2") || p.name.contains("retrofit"));
+    let has_okhttp = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("okhttp3") || p.name.contains("okhttp"));
+    let has_retrofit = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("retrofit2") || p.name.contains("retrofit"));
     if has_okhttp || has_retrofit {
         let mut evidence = Vec::new();
-        if has_okhttp { evidence.push("OkHttp HTTP client found".to_string()); }
-        if has_retrofit { evidence.push("Retrofit REST client found".to_string()); }
+        if has_okhttp {
+            evidence.push("OkHttp HTTP client found".to_string());
+        }
+        if has_retrofit {
+            evidence.push("Retrofit REST client found".to_string());
+        }
         results.push(TechStackEntry {
             name: "OkHttp / Retrofit".to_string(),
             confidence: "high".to_string(),
@@ -141,8 +165,14 @@ pub fn detect(
     }
 
     // === Glide / Picasso / Coil ===
-    let has_glide = _dex.packages.iter().any(|p| p.name.contains("com.bumptech.glide"));
-    let has_picasso = _dex.packages.iter().any(|p| p.name.contains("com.squareup.picasso"));
+    let has_glide = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("com.bumptech.glide"));
+    let has_picasso = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("com.squareup.picasso"));
     let has_coil = _dex.packages.iter().any(|p| p.name.contains("coil"));
     if has_glide {
         results.push(TechStackEntry {
@@ -167,7 +197,10 @@ pub fn detect(
     }
 
     // === Room ===
-    let has_room = _dex.packages.iter().any(|p| p.name.contains("androidx.room"));
+    let has_room = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("androidx.room"));
     if has_room {
         results.push(TechStackEntry {
             name: "Room (SQLite ORM)".to_string(),
@@ -178,7 +211,10 @@ pub fn detect(
 
     // === Firebase ===
     let has_firebase = file_names.iter().any(|f| f.contains("firebase"))
-        || _dex.packages.iter().any(|p| p.name.contains("com.google.firebase"));
+        || _dex
+            .packages
+            .iter()
+            .any(|p| p.name.contains("com.google.firebase"));
     if has_firebase {
         results.push(TechStackEntry {
             name: "Firebase".to_string(),
@@ -188,7 +224,10 @@ pub fn detect(
     }
 
     // === Google Play Services ===
-    let has_gms = _dex.packages.iter().any(|p| p.name.contains("com.google.android.gms"));
+    let has_gms = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("com.google.android.gms"));
     if has_gms {
         results.push(TechStackEntry {
             name: "Google Play Services".to_string(),
@@ -198,8 +237,13 @@ pub fn detect(
     }
 
     // === WebView-based (Hybrid) ===
-    let has_webview = manifest.activities.iter().any(|a| a.name.contains("WebView"))
-        || file_names.iter().any(|f| f.starts_with("assets/www/") && f.ends_with(".html"));
+    let has_webview = manifest
+        .activities
+        .iter()
+        .any(|a| a.name.contains("WebView"))
+        || file_names
+            .iter()
+            .any(|f| f.starts_with("assets/www/") && f.ends_with(".html"));
     if has_webview && !has_cordova && !has_rn {
         results.push(TechStackEntry {
             name: "WebView (Hybrid)".to_string(),
@@ -209,7 +253,10 @@ pub fn detect(
     }
 
     // === Coroutines ===
-    let has_coroutines = _dex.packages.iter().any(|p| p.name.contains("kotlinx.coroutines"));
+    let has_coroutines = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("kotlinx.coroutines"));
     if has_coroutines {
         results.push(TechStackEntry {
             name: "Kotlin Coroutines".to_string(),
@@ -219,7 +266,10 @@ pub fn detect(
     }
 
     // === RxJava ===
-    let has_rxjava = _dex.packages.iter().any(|p| p.name.contains("io.reactivex"));
+    let has_rxjava = _dex
+        .packages
+        .iter()
+        .any(|p| p.name.contains("io.reactivex"));
     if has_rxjava {
         results.push(TechStackEntry {
             name: "RxJava".to_string(),
@@ -229,8 +279,13 @@ pub fn detect(
     }
 
     // === Native (C/C++) ===
-    let has_native = file_names.iter().any(|f| f.starts_with("lib/") && f.ends_with(".so")
-        && !f.contains("libflutter") && !f.contains("libreact") && !f.contains("libunity"));
+    let has_native = file_names.iter().any(|f| {
+        f.starts_with("lib/")
+            && f.ends_with(".so")
+            && !f.contains("libflutter")
+            && !f.contains("libreact")
+            && !f.contains("libunity")
+    });
     if has_native {
         results.push(TechStackEntry {
             name: "C/C++ (Native)".to_string(),

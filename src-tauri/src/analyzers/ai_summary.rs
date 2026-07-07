@@ -1,6 +1,6 @@
-use crate::parser::ApkReader;
 use crate::models::ai_summary::*;
 use crate::models::analysis::ApkAnalysis;
+use crate::parser::ApkReader;
 use crate::utils::tech_detector;
 
 pub struct AISummaryAnalyzer;
@@ -63,22 +63,36 @@ pub fn generate_summary(apk: &mut ApkReader, analysis: &ApkAnalysis) -> AISummar
     }
 }
 
-fn guess_app_type(permissions: &[crate::models::permissions::PermissionInfo], manifest: &crate::models::manifest::ManifestInfo) -> String {
+fn guess_app_type(
+    permissions: &[crate::models::permissions::PermissionInfo],
+    manifest: &crate::models::manifest::ManifestInfo,
+) -> String {
     let perm_names: Vec<&str> = permissions.iter().map(|p| p.name.as_str()).collect();
 
-    if perm_names.iter().any(|p| p.contains("BILLING") || p.contains("PURCHASE")) {
+    if perm_names
+        .iter()
+        .any(|p| p.contains("BILLING") || p.contains("PURCHASE"))
+    {
         return "E-commerce / Shopping app with in-app purchases".to_string();
     }
-    if perm_names.iter().any(|p| p.contains("LOCATION")) && perm_names.iter().any(|p| p.contains("CAMERA")) {
+    if perm_names.iter().any(|p| p.contains("LOCATION"))
+        && perm_names.iter().any(|p| p.contains("CAMERA"))
+    {
         return "Social / LBS app (location + camera features)".to_string();
     }
     if perm_names.iter().any(|p| p.contains("RECORD_AUDIO")) {
         return "Communication / Media app (audio recording)".to_string();
     }
-    if perm_names.iter().any(|p| p.contains("SMS") || p.contains("CALL_PHONE")) {
+    if perm_names
+        .iter()
+        .any(|p| p.contains("SMS") || p.contains("CALL_PHONE"))
+    {
         return "Communication app (SMS/Phone features)".to_string();
     }
-    if perm_names.iter().any(|p| p.contains("WAKE_LOCK") && p.contains("VIBRATE")) {
+    if perm_names
+        .iter()
+        .any(|p| p.contains("WAKE_LOCK") && p.contains("VIBRATE"))
+    {
         return "Utility / Productivity app".to_string();
     }
     if manifest.providers.len() > 3 {
@@ -90,7 +104,10 @@ fn guess_app_type(permissions: &[crate::models::permissions::PermissionInfo], ma
     "General purpose application".to_string()
 }
 
-fn guess_architecture(tech_stack: &[TechStackEntry], stats: &crate::models::components::ComponentStats) -> String {
+fn guess_architecture(
+    tech_stack: &[TechStackEntry],
+    stats: &crate::models::components::ComponentStats,
+) -> String {
     let mut parts = Vec::new();
 
     for ts in tech_stack {
@@ -127,7 +144,9 @@ fn collect_risks(analysis: &ApkAnalysis) -> Vec<String> {
         risks.push("Backup is enabled - sensitive data may be extractable via adb".to_string());
     }
     if analysis.certificate.is_debug_certificate {
-        risks.push("Signed with a debug certificate - not suitable for production release".to_string());
+        risks.push(
+            "Signed with a debug certificate - not suitable for production release".to_string(),
+        );
     }
     if analysis.certificate.is_expired {
         risks.push("Certificate has expired - app may not install on newer devices".to_string());
@@ -135,16 +154,25 @@ fn collect_risks(analysis: &ApkAnalysis) -> Vec<String> {
 
     let exported_count = analysis.components.stats.exported;
     if exported_count > 5 {
-        risks.push(format!("{} exported components - review each for security implications", exported_count));
+        risks.push(format!(
+            "{} exported components - review each for security implications",
+            exported_count
+        ));
     }
 
     let dangerous_perms = analysis.permissions.summary.dangerous;
     if dangerous_perms > 10 {
-        risks.push(format!("{} dangerous permissions - ensure each is justified and necessary", dangerous_perms));
+        risks.push(format!(
+            "{} dangerous permissions - ensure each is justified and necessary",
+            dangerous_perms
+        ));
     }
 
     if analysis.overview.target_sdk.parse::<u32>().unwrap_or(0) < 30 {
-        risks.push("Low target SDK version - missing security improvements from recent Android versions".to_string());
+        risks.push(
+            "Low target SDK version - missing security improvements from recent Android versions"
+                .to_string(),
+        );
     }
 
     if risks.is_empty() {
@@ -160,29 +188,44 @@ fn collect_performance_suggestions(analysis: &ApkAnalysis) -> Vec<String> {
     // APK size analysis
     let apk_mb = analysis.overview.apk_size as f64 / 1_048_576.0;
     if apk_mb > 100.0 {
-        suggestions.push(format!("APK is {:.0}MB - consider using App Bundle (AAB) for size optimization", apk_mb));
+        suggestions.push(format!(
+            "APK is {:.0}MB - consider using App Bundle (AAB) for size optimization",
+            apk_mb
+        ));
     } else if apk_mb > 50.0 {
-        suggestions.push(format!("APK is {:.0}MB - review large resources and consider asset optimization", apk_mb));
+        suggestions.push(format!(
+            "APK is {:.0}MB - review large resources and consider asset optimization",
+            apk_mb
+        ));
     }
 
     // DEX analysis
     if analysis.dex.summary.total_methods > 65000 {
-        suggestions.push("Method count exceeds 65K - ensure multidex is properly configured".to_string());
+        suggestions
+            .push("Method count exceeds 65K - ensure multidex is properly configured".to_string());
     }
 
     // Native libs
     if analysis.native_libs.summary.abis.len() > 3 {
-        suggestions.push("Multiple ABIs bundled - consider using App Bundle for per-ABI delivery".to_string());
+        suggestions.push(
+            "Multiple ABIs bundled - consider using App Bundle for per-ABI delivery".to_string(),
+        );
     }
 
     // Resource analysis
     let total_res_mb = analysis.resources.summary.total_size as f64 / 1_048_576.0;
     if total_res_mb > 20.0 {
-        suggestions.push(format!("Resources total {:.0}MB - optimize images and remove unused resources", total_res_mb));
+        suggestions.push(format!(
+            "Resources total {:.0}MB - optimize images and remove unused resources",
+            total_res_mb
+        ));
     }
 
     if !analysis.resources.duplicate_resources.is_empty() {
-        suggestions.push(format!("{} duplicate resources detected - consolidate to save space", analysis.resources.duplicate_resources.len()));
+        suggestions.push(format!(
+            "{} duplicate resources detected - consolidate to save space",
+            analysis.resources.duplicate_resources.len()
+        ));
     }
 
     if suggestions.is_empty() {
@@ -196,15 +239,25 @@ fn collect_packaging_suggestions(analysis: &ApkAnalysis) -> Vec<String> {
     let mut suggestions = Vec::new();
 
     if !analysis.certificate.has_v2 {
-        suggestions.push("Use APK Signature Scheme v2 or v3 for faster install and better security".to_string());
+        suggestions.push(
+            "Use APK Signature Scheme v2 or v3 for faster install and better security".to_string(),
+        );
     }
 
     if analysis.overview.extract_native_libs {
-        suggestions.push("Consider setting extractNativeLibs=\"false\" to reduce install size".to_string());
+        suggestions.push(
+            "Consider setting extractNativeLibs=\"false\" to reduce install size".to_string(),
+        );
     }
 
     let total_libs = analysis.native_libs.summary.total;
-    if total_libs > 0 && analysis.native_libs.summary.abis.contains(&"armeabi-v7a".to_string()) {
+    if total_libs > 0
+        && analysis
+            .native_libs
+            .summary
+            .abis
+            .contains(&"armeabi-v7a".to_string())
+    {
         suggestions.push("Consider dropping armeabi-v7a if targeting modern devices (arm64-v8a covers 99%+ of devices)".to_string());
     }
 

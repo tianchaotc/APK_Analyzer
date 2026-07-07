@@ -1,8 +1,8 @@
 pub mod apk;
 pub mod axml;
-pub mod signing;
-pub mod resources;
 pub mod dex;
+pub mod resources;
+pub mod signing;
 
 use std::io::Read;
 use zip::ZipArchive;
@@ -17,9 +17,9 @@ pub struct ApkReader {
 impl ApkReader {
     /// Open an APK file from disk
     pub fn open(path: &str) -> Result<Self, String> {
-        let file = std::fs::File::open(path)
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-        let metadata = file.metadata()
+        let file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+        let metadata = file
+            .metadata()
             .map_err(|e| format!("Failed to read metadata: {}", e))?;
         let archive = ZipArchive::new(file)
             .map_err(|e| format!("Failed to read APK (not a valid ZIP): {}", e))?;
@@ -32,7 +32,9 @@ impl ApkReader {
 
     /// Read a file from the APK by name
     pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, String> {
-        let mut file = self.archive.by_name(name)
+        let mut file = self
+            .archive
+            .by_name(name)
             .map_err(|e| format!("File '{}' not found in APK: {}", name, e))?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)
@@ -60,11 +62,7 @@ impl ApkReader {
         let mut entries = Vec::new();
         for i in 0..self.archive.len() {
             if let Ok(file) = self.archive.by_index(i) {
-                entries.push((
-                    file.name().to_string(),
-                    file.size(),
-                    file.compressed_size(),
-                ));
+                entries.push((file.name().to_string(), file.size(), file.compressed_size()));
             }
         }
         entries

@@ -15,11 +15,8 @@ pub struct HostApi {
         out: *mut *mut u8,
         out_len: *mut usize,
     ) -> c_int,
-    pub list_apk_files: extern "C" fn(
-        ctx: *const c_void,
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int,
+    pub list_apk_files:
+        extern "C" fn(ctx: *const c_void, out: *mut *mut c_char, out_len: *mut usize) -> c_int,
     pub parse_axml: extern "C" fn(
         ctx: *const c_void,
         bytes: *const u8,
@@ -41,12 +38,7 @@ pub struct HostApi {
         out: *mut *mut c_char,
         out_len: *mut usize,
     ) -> c_int,
-    pub log: extern "C" fn(
-        ctx: *const c_void,
-        level: c_int,
-        msg: *const c_char,
-        msg_len: usize,
-    ),
+    pub log: extern "C" fn(ctx: *const c_void, level: c_int, msg: *const c_char, msg_len: usize),
     pub free_host: extern "C" fn(ptr: *mut c_void, len: usize),
 }
 
@@ -62,28 +54,29 @@ pub struct PluginVTable {
         out: *mut *mut c_char,
         out_len: *mut usize,
     ) -> c_int,
-    pub ui_schema: extern "C" fn(
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int,
-    pub export: Option<extern "C" fn(
-        host: *const HostApi,
-        fmt: *const c_char,
-        fmt_len: usize,
-        data: *const c_char,
-        data_len: usize,
-        out: *mut *mut u8,
-        out_len: *mut usize,
-    ) -> c_int>,
-    pub command: Option<extern "C" fn(
-        host: *const HostApi,
-        cmd: *const c_char,
-        cmd_len: usize,
-        args: *const c_char,
-        args_len: usize,
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int>,
+    pub ui_schema: extern "C" fn(out: *mut *mut c_char, out_len: *mut usize) -> c_int,
+    pub export: Option<
+        extern "C" fn(
+            host: *const HostApi,
+            fmt: *const c_char,
+            fmt_len: usize,
+            data: *const c_char,
+            data_len: usize,
+            out: *mut *mut u8,
+            out_len: *mut usize,
+        ) -> c_int,
+    >,
+    pub command: Option<
+        extern "C" fn(
+            host: *const HostApi,
+            cmd: *const c_char,
+            cmd_len: usize,
+            args: *const c_char,
+            args_len: usize,
+            out: *mut *mut c_char,
+            out_len: *mut usize,
+        ) -> c_int,
+    >,
     pub free: extern "C" fn(ptr: *mut c_void, len: usize),
 }
 

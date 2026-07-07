@@ -13,7 +13,6 @@ pub struct HostApi {
     pub ctx: *const c_void,
 
     // —— 文件与 APK 访问 ——
-
     /// 读取 APK 内的文件，返回堆分配的字节缓冲区。
     /// 调用者负责用 `HostApi` 的释放函数或插件 `free` 释放（取决于分配方）。
     /// 返回码：0=成功，-1=文件不存在，-2=参数无效，-3=内存分配失败
@@ -27,14 +26,10 @@ pub struct HostApi {
 
     /// 列出 APK 内所有文件名（返回 JSON 数组字符串 `["a","b"]`）。
     /// 缓冲区由宿主分配，插件必须用 `HostApi.free_host` 释放。
-    pub list_apk_files: extern "C" fn(
-        ctx: *const c_void,
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int,
+    pub list_apk_files:
+        extern "C" fn(ctx: *const c_void, out: *mut *mut c_char, out_len: *mut usize) -> c_int,
 
     // —— 复用宿主解析器 ——
-
     /// 解析二进制 AndroidManifest.xml，返回 JSON（AxmlElement 树序列化）。
     /// 复用宿主已调试好的 AXML 解码器，插件无需重新实现。
     pub parse_axml: extern "C" fn(
@@ -55,7 +50,6 @@ pub struct HostApi {
     ) -> c_int,
 
     // —— 查询其他分析器结果 ——
-
     /// 按 key 查询已完成的内置分析器结果。
     /// key ∈ {"overview","manifest","permissions","components","resources",
     ///         "native_libs","dex","certificate","security","ai_summary"}
@@ -69,17 +63,10 @@ pub struct HostApi {
     ) -> c_int,
 
     // —— 日志 ——
-
     /// level: 0=trace 1=debug 2=info 3=warn 4=error
-    pub log: extern "C" fn(
-        ctx: *const c_void,
-        level: c_int,
-        msg: *const c_char,
-        msg_len: usize,
-    ),
+    pub log: extern "C" fn(ctx: *const c_void, level: c_int, msg: *const c_char, msg_len: usize),
 
     // —— 释放宿主分配的缓冲区 ——
-
     /// 释放宿主通过 read_apk_file/list_apk_files/parse_axml/parse_dex/get_analysis 返回的缓冲区。
     /// ptr 和 len 是返回时给出的值。ptr 为 null 时无操作。
     pub free_host: extern "C" fn(ptr: *mut c_void, len: usize),
@@ -110,33 +97,34 @@ pub struct PluginVTable {
     ) -> c_int,
 
     /// 返回 UI schema JSON（声明式视图描述），需用 `free` 释放。
-    pub ui_schema: extern "C" fn(
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int,
+    pub ui_schema: extern "C" fn(out: *mut *mut c_char, out_len: *mut usize) -> c_int,
 
     /// 可选：导出报告。fmt: "pdf"/"sarif"/"custom"；data: 已完成分析的 JSON；
     /// 返回字节缓冲区（如 PDF 二进制），需用 `free` 释放。
-    pub export: Option<extern "C" fn(
-        host: *const HostApi,
-        fmt: *const c_char,
-        fmt_len: usize,
-        data: *const c_char,
-        data_len: usize,
-        out: *mut *mut u8,
-        out_len: *mut usize,
-    ) -> c_int>,
+    pub export: Option<
+        extern "C" fn(
+            host: *const HostApi,
+            fmt: *const c_char,
+            fmt_len: usize,
+            data: *const c_char,
+            data_len: usize,
+            out: *mut *mut u8,
+            out_len: *mut usize,
+        ) -> c_int,
+    >,
 
     /// 可选：执行命令动作。cmd: 命令名；args: JSON 参数；返回 JSON 结果，需用 `free` 释放。
-    pub command: Option<extern "C" fn(
-        host: *const HostApi,
-        cmd: *const c_char,
-        cmd_len: usize,
-        args: *const c_char,
-        args_len: usize,
-        out: *mut *mut c_char,
-        out_len: *mut usize,
-    ) -> c_int>,
+    pub command: Option<
+        extern "C" fn(
+            host: *const HostApi,
+            cmd: *const c_char,
+            cmd_len: usize,
+            args: *const c_char,
+            args_len: usize,
+            out: *mut *mut c_char,
+            out_len: *mut usize,
+        ) -> c_int,
+    >,
 
     /// 释放插件分配的缓冲区（analyze/ui_schema/export/command 返回的）。
     /// ptr 为 null 时无操作。

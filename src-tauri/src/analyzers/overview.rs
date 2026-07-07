@@ -1,5 +1,5 @@
-use crate::parser::ApkReader;
 use crate::models::overview::*;
+use crate::parser::ApkReader;
 use crate::utils::apk_utils;
 
 pub struct OverviewAnalyzer;
@@ -20,10 +20,12 @@ impl super::Analyzer for OverviewAnalyzer {
 
         let app_name = apk_utils::get_app_name(apk, &element);
         let package_name = element.get_attr("package").unwrap_or_default();
-        let version_name = element.get_attr("android:versionName")
+        let version_name = element
+            .get_attr("android:versionName")
             .or_else(|| element.get_attr("versionName"))
             .unwrap_or_default();
-        let version_code = element.get_attr("android:versionCode")
+        let version_code = element
+            .get_attr("android:versionCode")
             .or_else(|| element.get_attr("versionCode"))
             .unwrap_or_default();
 
@@ -33,16 +35,26 @@ impl super::Analyzer for OverviewAnalyzer {
         let (debuggable, allow_backup, extract_native_libs, uses_cleartext_traffic, instant_app) =
             if let Some(app) = element.find("application") {
                 (
-                    app.get_attr("android:debuggable").or_else(|| app.get_attr("debuggable"))
-                        .map(|v| v == "true").unwrap_or(false),
-                    app.get_attr("android:allowBackup").or_else(|| app.get_attr("allowBackup"))
-                        .map(|v| v != "false").unwrap_or(true),
-                    app.get_attr("android:extractNativeLibs").or_else(|| app.get_attr("extractNativeLibs"))
-                        .map(|v| v == "true").unwrap_or(false),
-                    app.get_attr("android:usesCleartextTraffic").or_else(|| app.get_attr("usesCleartextTraffic"))
-                        .map(|v| v == "true").unwrap_or(false),
-                    app.get_attr("android:isInstantApp").or_else(|| app.get_attr("isInstantApp"))
-                        .map(|v| v == "true").unwrap_or(false),
+                    app.get_attr("android:debuggable")
+                        .or_else(|| app.get_attr("debuggable"))
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    app.get_attr("android:allowBackup")
+                        .or_else(|| app.get_attr("allowBackup"))
+                        .map(|v| v != "false")
+                        .unwrap_or(true),
+                    app.get_attr("android:extractNativeLibs")
+                        .or_else(|| app.get_attr("extractNativeLibs"))
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    app.get_attr("android:usesCleartextTraffic")
+                        .or_else(|| app.get_attr("usesCleartextTraffic"))
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
+                    app.get_attr("android:isInstantApp")
+                        .or_else(|| app.get_attr("isInstantApp"))
+                        .map(|v| v == "true")
+                        .unwrap_or(false),
                 )
             } else {
                 (false, true, false, false, false)
@@ -61,9 +73,7 @@ impl super::Analyzer for OverviewAnalyzer {
         let split_apk = apk.has_file("resources.pb") || apk_utils::is_split_apk(&apk.file_names());
 
         // Estimate install size (APK uncompressed size)
-        let estimated_install_size = apk.entries().iter()
-            .map(|(_, size, _)| size)
-            .sum::<u64>();
+        let estimated_install_size = apk.entries().iter().map(|(_, size, _)| size).sum::<u64>();
 
         // Get app icon
         let app_icon_base64 = apk_utils::get_app_icon_base64(apk, &element);

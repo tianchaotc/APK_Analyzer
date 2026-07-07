@@ -1,6 +1,6 @@
+use md5::Md5;
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
-use md5::Md5;
 use x509_parser::parse_x509_certificate;
 
 /// APK Signing Block magic
@@ -26,8 +26,8 @@ pub struct CertInfo {
 
 /// Parse a DER-encoded X.509 certificate
 pub fn parse_x509_der(der: &[u8]) -> Result<CertInfo, String> {
-    let (_, cert) = parse_x509_certificate(der)
-        .map_err(|e| format!("Failed to parse X.509: {}", e))?;
+    let (_, cert) =
+        parse_x509_certificate(der).map_err(|e| format!("Failed to parse X.509: {}", e))?;
 
     let subject = cert.subject().to_string();
     let issuer = cert.issuer().to_string();
@@ -79,8 +79,7 @@ pub fn parse_x509_der(der: &[u8]) -> Result<CertInfo, String> {
 /// Parse the APK Signing Block to extract certificates
 pub fn parse_signing_block(zip_data: &[u8]) -> Result<Vec<CertInfo>, String> {
     // Find the End of Central Directory (EOCD)
-    let eocd_offset = find_eocd(zip_data)
-        .ok_or_else(|| "EOCD not found".to_string())?;
+    let eocd_offset = find_eocd(zip_data).ok_or_else(|| "EOCD not found".to_string())?;
 
     if eocd_offset + 16 > zip_data.len() {
         return Err("Invalid EOCD".to_string());
@@ -102,8 +101,14 @@ pub fn parse_signing_block(zip_data: &[u8]) -> Result<Vec<CertInfo>, String> {
     }
 
     let block_size = u64::from_le_bytes([
-        block_footer[0], block_footer[1], block_footer[2], block_footer[3],
-        block_footer[4], block_footer[5], block_footer[6], block_footer[7],
+        block_footer[0],
+        block_footer[1],
+        block_footer[2],
+        block_footer[3],
+        block_footer[4],
+        block_footer[5],
+        block_footer[6],
+        block_footer[7],
     ]) as usize;
 
     let block_start = cd_offset.saturating_sub(block_size + 8);
@@ -118,8 +123,14 @@ pub fn parse_signing_block(zip_data: &[u8]) -> Result<Vec<CertInfo>, String> {
 
     while offset + 12 <= block_data.len() {
         let pair_size = u64::from_le_bytes([
-            block_data[offset], block_data[offset + 1], block_data[offset + 2], block_data[offset + 3],
-            block_data[offset + 4], block_data[offset + 5], block_data[offset + 6], block_data[offset + 7],
+            block_data[offset],
+            block_data[offset + 1],
+            block_data[offset + 2],
+            block_data[offset + 3],
+            block_data[offset + 4],
+            block_data[offset + 5],
+            block_data[offset + 6],
+            block_data[offset + 7],
         ]) as usize;
 
         if offset + 8 + pair_size > block_data.len() {
@@ -127,7 +138,10 @@ pub fn parse_signing_block(zip_data: &[u8]) -> Result<Vec<CertInfo>, String> {
         }
 
         let pair_id = u32::from_le_bytes([
-            block_data[offset + 8], block_data[offset + 9], block_data[offset + 10], block_data[offset + 11],
+            block_data[offset + 8],
+            block_data[offset + 9],
+            block_data[offset + 10],
+            block_data[offset + 11],
         ]);
 
         let pair_data = &block_data[offset + 12..offset + 8 + pair_size];
@@ -156,7 +170,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
         return Ok(certs);
     }
     let signers_size = u32::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
     ]) as usize;
     offset += 4;
 
@@ -167,7 +184,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
             break;
         }
         let signer_size = u32::from_le_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
         ]) as usize;
         offset += 4;
 
@@ -181,7 +201,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
             break;
         }
         let signed_data_size = u32::from_le_bytes([
-            data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
         ]) as usize;
         offset += 4;
 
@@ -197,8 +220,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
         let mut sd_offset = 0;
         if sd_offset + 4 <= signed_data.len() {
             let digests_size = u32::from_le_bytes([
-                signed_data[sd_offset], signed_data[sd_offset + 1],
-                signed_data[sd_offset + 2], signed_data[sd_offset + 3],
+                signed_data[sd_offset],
+                signed_data[sd_offset + 1],
+                signed_data[sd_offset + 2],
+                signed_data[sd_offset + 3],
             ]) as usize;
             sd_offset += 4 + digests_size;
         }
@@ -206,8 +231,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
         // Certificates
         if sd_offset + 4 <= signed_data.len() {
             let certs_size = u32::from_le_bytes([
-                signed_data[sd_offset], signed_data[sd_offset + 1],
-                signed_data[sd_offset + 2], signed_data[sd_offset + 3],
+                signed_data[sd_offset],
+                signed_data[sd_offset + 1],
+                signed_data[sd_offset + 2],
+                signed_data[sd_offset + 3],
             ]) as usize;
             sd_offset += 4;
 
@@ -217,8 +244,10 @@ fn parse_signature_block(data: &[u8]) -> Result<Vec<CertInfo>, String> {
                     break;
                 }
                 let cert_size = u32::from_le_bytes([
-                    signed_data[sd_offset], signed_data[sd_offset + 1],
-                    signed_data[sd_offset + 2], signed_data[sd_offset + 3],
+                    signed_data[sd_offset],
+                    signed_data[sd_offset + 1],
+                    signed_data[sd_offset + 2],
+                    signed_data[sd_offset + 3],
                 ]) as usize;
                 sd_offset += 4;
 

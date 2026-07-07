@@ -1,5 +1,5 @@
-use crate::parser::ApkReader;
 use crate::models::resources::*;
+use crate::parser::ApkReader;
 use std::collections::HashMap;
 
 pub struct ResourceAnalyzer;
@@ -18,8 +18,7 @@ impl super::Analyzer for ResourceAnalyzer {
         let mut total_count: usize = 0;
 
         let resource_prefixes = [
-            "drawable", "layout", "xml", "font", "anim", "raw",
-            "values", "mipmap", "color", "menu",
+            "drawable", "layout", "xml", "font", "anim", "raw", "values", "mipmap", "color", "menu",
         ];
 
         let image_extensions = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"];
@@ -44,7 +43,8 @@ impl super::Analyzer for ResourceAnalyzer {
                 compression: Some(compression),
             };
 
-            by_type.entry(resource_type.clone())
+            by_type
+                .entry(resource_type.clone())
                 .or_default()
                 .push(entry);
 
@@ -53,7 +53,8 @@ impl super::Analyzer for ResourceAnalyzer {
         }
 
         // Build type groups
-        let mut type_groups: Vec<ResourceTypeGroup> = by_type.into_iter()
+        let mut type_groups: Vec<ResourceTypeGroup> = by_type
+            .into_iter()
             .map(|(type_name, mut entries)| {
                 entries.sort_by(|a, b| b.size.cmp(&a.size));
                 let total: u64 = entries.iter().map(|e| e.size).sum();
@@ -68,14 +69,13 @@ impl super::Analyzer for ResourceAnalyzer {
         type_groups.sort_by(|a, b| b.total_size.cmp(&a.total_size));
 
         // Largest resources (top 50)
-        let mut all_resources: Vec<ResourceEntry> = type_groups.iter()
+        let mut all_resources: Vec<ResourceEntry> = type_groups
+            .iter()
             .flat_map(|g| g.entries.iter().cloned())
             .collect();
         all_resources.sort_by(|a, b| b.size.cmp(&a.size));
-        let largest_resources: Vec<ResourceEntry> = all_resources.iter()
-            .take(50)
-            .cloned()
-            .collect();
+        let largest_resources: Vec<ResourceEntry> =
+            all_resources.iter().take(50).cloned().collect();
 
         // Find duplicates (same file name, different configs)
         let duplicate_resources = find_duplicates(&all_resources);
@@ -116,7 +116,8 @@ fn find_duplicates(resources: &[ResourceEntry]) -> Vec<DuplicateResource> {
         name_map.entry(r.name.clone()).or_default().push(r);
     }
 
-    let mut duplicates: Vec<DuplicateResource> = name_map.into_iter()
+    let mut duplicates: Vec<DuplicateResource> = name_map
+        .into_iter()
         .filter(|(_, entries)| entries.len() > 1)
         .map(|(name, entries)| {
             let total_size: u64 = entries.iter().map(|e| e.size).sum();
@@ -163,8 +164,13 @@ fn build_image_stats(entries: &[(String, u64, u64)], image_exts: &[&str]) -> Ima
     let total_images: usize = by_format.values().map(|(c, _)| c).sum();
     let total_size: u64 = by_format.values().map(|(_, s)| s).sum();
 
-    let mut by_format_vec: Vec<FormatStat> = by_format.into_iter()
-        .map(|(format, (count, total_size))| FormatStat { format, count, total_size })
+    let mut by_format_vec: Vec<FormatStat> = by_format
+        .into_iter()
+        .map(|(format, (count, total_size))| FormatStat {
+            format,
+            count,
+            total_size,
+        })
         .collect();
     by_format_vec.sort_by(|a, b| b.total_size.cmp(&a.total_size));
 

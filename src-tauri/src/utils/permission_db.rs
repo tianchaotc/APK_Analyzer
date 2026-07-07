@@ -60,14 +60,16 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
         },
         "android.permission.WAKE_LOCK" => PermissionDBEntry {
             protection_level: "normal".to_string(),
-            description: "Allows using PowerManager WakeLocks to keep processor from sleeping".to_string(),
+            description: "Allows using PowerManager WakeLocks to keep processor from sleeping"
+                .to_string(),
             risk_level: "low".to_string(),
             recommended_usage: "Keep CPU running during background tasks".to_string(),
             category: "Power".to_string(),
         },
         "android.permission.RECEIVE_BOOT_COMPLETED" => PermissionDBEntry {
             protection_level: "normal".to_string(),
-            description: "Allows an application to receive ACTION_BOOT_COMPLETED broadcast".to_string(),
+            description: "Allows an application to receive ACTION_BOOT_COMPLETED broadcast"
+                .to_string(),
             risk_level: "low".to_string(),
             recommended_usage: "Start service on device boot".to_string(),
             category: "System".to_string(),
@@ -104,7 +106,8 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
             protection_level: "dangerous".to_string(),
             description: "Allows access to location in the background".to_string(),
             risk_level: "high".to_string(),
-            recommended_usage: "Background location tracking (requires strong justification)".to_string(),
+            recommended_usage: "Background location tracking (requires strong justification)"
+                .to_string(),
             category: "Location".to_string(),
         },
         "android.permission.CAMERA" => PermissionDBEntry {
@@ -139,14 +142,16 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
             protection_level: "dangerous".to_string(),
             description: "Allows reading from external storage".to_string(),
             risk_level: "high".to_string(),
-            recommended_usage: "File access (deprecated on Android 13+, use scoped storage)".to_string(),
+            recommended_usage: "File access (deprecated on Android 13+, use scoped storage)"
+                .to_string(),
             category: "Storage".to_string(),
         },
         "android.permission.WRITE_EXTERNAL_STORAGE" => PermissionDBEntry {
             protection_level: "dangerous".to_string(),
             description: "Allows writing to external storage".to_string(),
             risk_level: "high".to_string(),
-            recommended_usage: "File writing (deprecated on Android 10+ with scoped storage)".to_string(),
+            recommended_usage: "File writing (deprecated on Android 10+ with scoped storage)"
+                .to_string(),
             category: "Storage".to_string(),
         },
         "android.permission.MANAGE_EXTERNAL_STORAGE" => PermissionDBEntry {
@@ -209,14 +214,16 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
             protection_level: "special".to_string(),
             description: "Allows drawing over other applications".to_string(),
             risk_level: "high".to_string(),
-            recommended_usage: "Floating windows, screen filters - requires special approval".to_string(),
+            recommended_usage: "Floating windows, screen filters - requires special approval"
+                .to_string(),
             category: "Overlay".to_string(),
         },
         "android.permission.BIND_ACCESSIBILITY_SERVICE" => PermissionDBEntry {
             protection_level: "signature".to_string(),
             description: "Must be required by accessibility services".to_string(),
             risk_level: "critical".to_string(),
-            recommended_usage: "Accessibility services only - requires explicit user grant".to_string(),
+            recommended_usage: "Accessibility services only - requires explicit user grant"
+                .to_string(),
             category: "Accessibility".to_string(),
         },
         "android.permission.REQUEST_INSTALL_PACKAGES" => PermissionDBEntry {
@@ -228,28 +235,33 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
         },
         "android.permission.QUERY_ALL_PACKAGES" => PermissionDBEntry {
             protection_level: "normal".to_string(),
-            description: "Allows query of any normal app on device (Play Store restricted)".to_string(),
+            description: "Allows query of any normal app on device (Play Store restricted)"
+                .to_string(),
             risk_level: "high".to_string(),
-            recommended_usage: "App stores, launchers - requires Play Store declaration".to_string(),
+            recommended_usage: "App stores, launchers - requires Play Store declaration"
+                .to_string(),
             category: "Package".to_string(),
         },
         "android.permission.READ_MEDIA_IMAGES" => PermissionDBEntry {
             protection_level: "dangerous".to_string(),
-            description: "Allows reading image files from external storage (Android 13+)".to_string(),
+            description: "Allows reading image files from external storage (Android 13+)"
+                .to_string(),
             risk_level: "medium".to_string(),
             recommended_usage: "Image gallery, photo editing apps".to_string(),
             category: "Storage".to_string(),
         },
         "android.permission.READ_MEDIA_VIDEO" => PermissionDBEntry {
             protection_level: "dangerous".to_string(),
-            description: "Allows reading video files from external storage (Android 13+)".to_string(),
+            description: "Allows reading video files from external storage (Android 13+)"
+                .to_string(),
             risk_level: "medium".to_string(),
             recommended_usage: "Video player, video editing apps".to_string(),
             category: "Storage".to_string(),
         },
         "android.permission.READ_MEDIA_AUDIO" => PermissionDBEntry {
             protection_level: "dangerous".to_string(),
-            description: "Allows reading audio files from external storage (Android 13+)".to_string(),
+            description: "Allows reading audio files from external storage (Android 13+)"
+                .to_string(),
             risk_level: "medium".to_string(),
             recommended_usage: "Music player, audio editing apps".to_string(),
             category: "Storage".to_string(),
@@ -265,7 +277,8 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
             protection_level: "normal".to_string(),
             description: "Allows discovery and pairing of Bluetooth devices".to_string(),
             risk_level: "low".to_string(),
-            recommended_usage: "Bluetooth device management (deprecated on Android 12+)".to_string(),
+            recommended_usage: "Bluetooth device management (deprecated on Android 12+)"
+                .to_string(),
             category: "Bluetooth".to_string(),
         },
         "android.permission.BLUETOOTH_SCAN" => PermissionDBEntry {
@@ -347,7 +360,8 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
         },
         "android.permission.ACTIVITY_RECOGNITION" => PermissionDBEntry {
             protection_level: "dangerous".to_string(),
-            description: "Allows recognition of physical activity (walking, running, etc.)".to_string(),
+            description: "Allows recognition of physical activity (walking, running, etc.)"
+                .to_string(),
             risk_level: "medium".to_string(),
             recommended_usage: "Fitness tracking, pedometer".to_string(),
             category: "Sensors".to_string(),
@@ -363,7 +377,8 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
             protection_level: "normal".to_string(),
             description: "Allows requesting authentication tokens (deprecated)".to_string(),
             risk_level: "medium".to_string(),
-            recommended_usage: "Account authentication (deprecated, use AccountManager)".to_string(),
+            recommended_usage: "Account authentication (deprecated, use AccountManager)"
+                .to_string(),
             category: "Accounts".to_string(),
         },
         _ => {
@@ -376,7 +391,9 @@ pub fn lookup(name: &str) -> PermissionDBEntry {
                     recommended_usage: "Review documentation for this permission".to_string(),
                     category: "System".to_string(),
                 }
-            } else if name.starts_with("com.google.android") || name.starts_with("com.google.android.gms") {
+            } else if name.starts_with("com.google.android")
+                || name.starts_with("com.google.android.gms")
+            {
                 PermissionDBEntry {
                     protection_level: "normal".to_string(),
                     description: format!("Google services permission: {}", name),
